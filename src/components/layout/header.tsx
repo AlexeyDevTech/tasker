@@ -57,9 +57,8 @@ export function Header({ user, projectId }: HeaderProps) {
     toggleSidebar, 
     viewSettings, 
     setViewMode,
-    setCreateProjectModalOpen,
   } = useProjectStore();
-  const { setCommandPaletteOpen, setNotificationsPanelOpen } = useUIStore();
+  const { setCommandPaletteOpen, setNotificationsPanelOpen, setCreateProjectModalOpen } = useUIStore();
   
   const handleLogout = () => {
     // Clear any stored session data
@@ -194,9 +193,6 @@ export function Header({ user, projectId }: HeaderProps) {
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
                 <Link href="/settings">Настройки</Link>
-              </DropdownMenuItem>
-              <DropdownMenuItem asChild>
-                <Link href="/settings/profile">Профиль</Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem 

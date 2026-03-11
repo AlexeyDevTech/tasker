@@ -124,16 +124,6 @@ export function CommandPalette({ projects = [] }: CommandPaletteProps) {
                 Настройки
               </CommandItem>
             </CommandGroup>
-
-            <CommandSeparator />
-
-            {/* AI Assistant */}
-            <CommandGroup heading="AI Ассистент">
-              <CommandItem>
-                <Sparkles className="mr-2 h-4 w-4" />
-                Открыть AI помощника
-              </CommandItem>
-            </CommandGroup>
           </CommandList>
         </Command>
       </DialogContent>

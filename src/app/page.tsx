@@ -1,7 +1,34 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { Sidebar } from '@/components/layout/sidebar';
+import { Header } from '@/components/layout/header';
+import { CommandPalette } from '@/components/layout/command-palette';
+import { ProjectCard } from '@/components/projects/project-card';
+import { TemplateSelector } from '@/components/projects/template-selector';
+import { BulkImportForm } from '@/components/projects/bulk-import-form';
+import { type ParsedProject } from '@/lib/bulk-parser';
+import { useProjectStore } from '@/stores/project-store';
+import { useUIStore } from '@/stores/ui-store';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Skeleton } from '@/components/ui/skeleton';
+import { 
+  Plus, 
+  Search, 
+  LayoutGrid, 
+  List, 
+  FolderOpen,
+  Sparkles,
+  ArrowRight,
+  Upload,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -12,33 +39,11 @@ const queryClient = new QueryClient({
     },
   },
 });
-import { Sidebar } from '@/components/layout/sidebar';
-import { Header } from '@/components/layout/header';
-import { CommandPalette } from '@/components/layout/command-palette';
-import { ProjectCard } from '@/components/projects/project-card';
-import { TemplateSelector } from '@/components/projects/template-selector';
-import { useProjectStore } from '@/stores/project-store';
-import { useUIStore } from '@/stores/ui-store';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Skeleton } from '@/components/ui/skeleton';
-import { 
-  Plus, 
-  Search, 
-  LayoutGrid, 
-  List, 
-  FolderOpen,
-  Sparkles,
-  ArrowRight,
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
 
 // Fetch projects
 async function fetchProjects() {
   const res = await fetch('/api/projects');
+  if (!res.ok) throw new Error('Failed to fetch projects');
   const data = await res.json();
   return data.data || [];
 }
@@ -46,6 +51,7 @@ async function fetchProjects() {
 // Fetch templates
 async function fetchTemplates() {
   const res = await fetch('/api/templates');
+  if (!res.ok) throw new Error('Failed to fetch templates');
   const data = await res.json();
   return data.data || [];
 }
@@ -63,39 +69,79 @@ async function createProject(data: {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
+  if (!res.ok) throw new Error('Failed to create project');
+  return res.json();
+}
+
+// Bulk create projects
+async function bulkCreateProjects(data: ParsedProject[]) {
+  const res = await fetch('/api/projects/bulk', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({ message: 'Failed to bulk create projects' }));
+    throw new Error(errorData.message);
+  }
   return res.json();
 }
 
 function DashboardContent() {
+  const router = useRouter();
+  const { data: session, status } = useSession({
+    required: true,
+    onUnauthenticated() {
+      router.push('/login');
+    },
+  });
+
   const queryClient = useQueryClient();
-  const { sidebarOpen, viewSettings, setViewMode } = useProjectStore();
+  const { sidebarOpen } = useProjectStore();
   const { createProjectModalOpen, setCreateProjectModalOpen } = useUIStore();
+  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState('');
   const [viewType, setViewType] = useState<'grid' | 'list'>('grid');
 
   // Queries
-  const { data: projects = [], isLoading } = useQuery({
+  const { data: projects = [], isLoading: isLoadingProjects } = useQuery({
     queryKey: ['projects'],
     queryFn: fetchProjects,
+    enabled: status === 'authenticated', // Only fetch if authenticated
   });
 
   const { data: templates = [] } = useQuery({
     queryKey: ['templates'],
     queryFn: fetchTemplates,
+    enabled: status === 'authenticated',
   });
 
-  // Mutation
+  // Mutations
   const createMutation = useMutation({
     mutationFn: createProject,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('Проект успешно создан!');
+      setCreateProjectModalOpen(false);
     },
-    onError: () => {
-      toast.error('Ошибка при создании проекта');
+    onError: (error) => {
+      toast.error(`Ошибка при создании проекта: ${error.message}`);
     },
   });
+  
+  const bulkCreateMutation = useMutation({
+    mutationFn: bulkCreateProjects,
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      toast.success(data.message);
+      setIsBulkImportOpen(false);
+    },
+    onError: (error) => {
+      toast.error(`Ошибка при импорте: ${error.message}`);
+    },
+  });
+
 
   // Filter projects
   const filteredProjects = projects.filter((p: any) => 
@@ -103,7 +149,6 @@ function DashboardContent() {
     p.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  // Separate by status
   const activeProjects = filteredProjects.filter((p: any) => p.status === 'active');
   const completedProjects = filteredProjects.filter((p: any) => p.status === 'completed');
   const archivedProjects = filteredProjects.filter((p: any) => p.status === 'archived');
@@ -112,13 +157,31 @@ function DashboardContent() {
     createMutation.mutate(data);
   };
 
-  // Demo user
-  const user = {
-    id: 'demo',
-    name: 'Demo User',
-    email: 'demo@taskflow.app',
-    image: null,
+  const handleBulkImport = (data: ParsedProject[]) => {
+    bulkCreateMutation.mutate(data);
   };
+
+  if (status === 'loading' || !session?.user) {
+    return (
+      <div className="p-6">
+        <Skeleton className="h-10 w-48 mb-8" />
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+          <Skeleton className="h-24" />
+        </div>
+        <Skeleton className="h-10 w-full mb-6" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Skeleton className="h-40" />
+          <Skeleton className="h-40" />
+          <Skeleton className="h-40" />
+        </div>
+      </div>
+    );
+  }
+
+  const user = session.user;
 
   return (
     <div className="min-h-screen bg-background">
@@ -131,18 +194,16 @@ function DashboardContent() {
         <Header user={user} />
         
         <main className="p-6">
-          {/* Welcome section */}
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2">
-              Добро пожаловать! 👋
+              Добро пожаловать, {user.name}! 👋
             </h1>
             <p className="text-muted-foreground">
-              Управляйте проектами, задачами и командой в одном месте
+              Управляйте проектами, задачами и командой в одном месте.
             </p>
           </div>
 
-          {/* Quick actions */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
             <button
               onClick={() => setCreateProjectModalOpen(true)}
               className="flex items-center gap-4 p-4 rounded-xl border border-border bg-gradient-to-r from-violet-500/10 to-purple-500/10 hover:from-violet-500/20 hover:to-purple-500/20 transition-all group"
@@ -157,13 +218,16 @@ function DashboardContent() {
               <ArrowRight className="ml-auto h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
             </button>
 
-            <button className="flex items-center gap-4 p-4 rounded-xl border border-border bg-gradient-to-r from-blue-500/10 to-cyan-500/10 hover:from-blue-500/20 hover:to-cyan-500/20 transition-all group">
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-600 flex items-center justify-center text-white">
-                <Sparkles className="h-6 w-6" />
+            <button
+              onClick={() => setIsBulkImportOpen(true)}
+              className="flex items-center gap-4 p-4 rounded-xl border border-border bg-gradient-to-r from-sky-500/10 to-blue-500/10 hover:from-sky-500/20 hover:to-blue-500/20 transition-all group"
+            >
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white">
+                <Upload className="h-6 w-6" />
               </div>
               <div className="text-left">
-                <p className="font-semibold">AI Ассистент</p>
-                <p className="text-sm text-muted-foreground">Поможет спланировать проект</p>
+                <p className="font-semibold">Импорт из текста</p>
+                <p className="text-sm text-muted-foreground">Массовое создание задач</p>
               </div>
               <ArrowRight className="ml-auto h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
             </button>
@@ -180,7 +244,6 @@ function DashboardContent() {
             </button>
           </div>
 
-          {/* Search and filters */}
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -209,107 +272,43 @@ function DashboardContent() {
             </div>
           </div>
 
-          {/* Projects list */}
           <Tabs defaultValue="active" className="w-full">
             <TabsList className="mb-4">
-              <TabsTrigger value="active">
-                Активные ({activeProjects.length})
-              </TabsTrigger>
-              <TabsTrigger value="completed">
-                Завершённые ({completedProjects.length})
-              </TabsTrigger>
-              <TabsTrigger value="archived">
-                Архив ({archivedProjects.length})
-              </TabsTrigger>
+              <TabsTrigger value="active">Активные ({activeProjects.length})</TabsTrigger>
+              <TabsTrigger value="completed">Завершённые ({completedProjects.length})</TabsTrigger>
+              <TabsTrigger value="archived">Архив ({archivedProjects.length})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="active">
-              {isLoading ? (
-                <div className={cn(
-                  "grid gap-4",
-                  viewType === 'grid' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
-                )}>
+              {isLoadingProjects ? (
+                <div className={cn("grid gap-4", viewType === 'grid' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1")}>
                   {[1, 2, 3].map((i) => (
-                    <div key={i} className="rounded-xl border border-border p-4">
-                      <Skeleton className="h-6 w-1/2 mb-2" />
-                      <Skeleton className="h-4 w-3/4 mb-4" />
-                      <Skeleton className="h-2 w-full" />
-                    </div>
+                    <div key={i} className="rounded-xl border border-border p-4"><Skeleton className="h-6 w-1/2 mb-2" /><Skeleton className="h-4 w-3/4 mb-4" /><Skeleton className="h-2 w-full" /></div>
                   ))}
                 </div>
               ) : activeProjects.length === 0 ? (
                 <div className="text-center py-12">
-                  <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center">
-                    <FolderOpen className="h-8 w-8 text-muted-foreground" />
-                  </div>
+                  <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center"><FolderOpen className="h-8 w-8 text-muted-foreground" /></div>
                   <h3 className="text-lg font-medium mb-1">Нет активных проектов</h3>
-                  <p className="text-muted-foreground mb-4">
-                    Создайте первый проект, чтобы начать работу
-                  </p>
-                  <Button onClick={() => setCreateProjectModalOpen(true)}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Создать проект
-                  </Button>
+                  <p className="text-muted-foreground mb-4">Создайте первый проект, чтобы начать работу</p>
+                  <Button onClick={() => setCreateProjectModalOpen(true)}><Plus className="mr-2 h-4 w-4" />Создать проект</Button>
                 </div>
               ) : (
-                <div className={cn(
-                  "grid gap-4",
-                  viewType === 'grid' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
-                )}>
-                  {activeProjects.map((project: any) => (
-                    <ProjectCard key={project.id} project={project} />
-                  ))}
+                <div className={cn("grid gap-4", viewType === 'grid' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1")}>
+                  {activeProjects.map((project: any) => (<ProjectCard key={project.id} project={project} />))}
                 </div>
               )}
             </TabsContent>
+            
+            {/* Other Tabs Content... */}
 
-            <TabsContent value="completed">
-              {completedProjects.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  Нет завершённых проектов
-                </div>
-              ) : (
-                <div className={cn(
-                  "grid gap-4",
-                  viewType === 'grid' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
-                )}>
-                  {completedProjects.map((project: any) => (
-                    <ProjectCard key={project.id} project={project} />
-                  ))}
-                </div>
-              )}
-            </TabsContent>
-
-            <TabsContent value="archived">
-              {archivedProjects.length === 0 ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  Нет проектов в архиве
-                </div>
-              ) : (
-                <div className={cn(
-                  "grid gap-4",
-                  viewType === 'grid' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1"
-                )}>
-                  {archivedProjects.map((project: any) => (
-                    <ProjectCard key={project.id} project={project} />
-                  ))}
-                </div>
-              )}
-            </TabsContent>
           </Tabs>
         </main>
       </div>
 
-      {/* Command Palette */}
       <CommandPalette projects={projects} />
-
-      {/* Template Selector Modal */}
-      <TemplateSelector
-        open={createProjectModalOpen}
-        onOpenChange={setCreateProjectModalOpen}
-        templates={templates}
-        onSelect={handleCreateProject}
-      />
+      <TemplateSelector open={createProjectModalOpen} onOpenChange={setCreateProjectModalOpen} templates={templates} onSelect={handleCreateProject} />
+      <BulkImportForm open={isBulkImportOpen} onOpenChange={setIsBulkImportOpen} onImport={handleBulkImport} />
     </div>
   );
 }

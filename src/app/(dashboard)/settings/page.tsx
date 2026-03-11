@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
@@ -34,8 +34,10 @@ import {
   Monitor,
   Save,
 } from 'lucide-react';
+import { useSession } from 'next-auth/react';
 import { cn } from '@/lib/utils';
 import { useTheme } from 'next-themes';
+import { toast } from 'sonner';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -58,25 +60,69 @@ function SettingsContent() {
   const { sidebarOpen } = useProjectStore();
   const { theme, setTheme } = useTheme();
   const [saving, setSaving] = useState(false);
-
+  
   const { data: projects = [] } = useQuery({
     queryKey: ['projects'],
     queryFn: fetchProjects,
   });
 
+  const { data: session, update: updateSession } = useSession();
+  const user = session?.user;
+
+  // Form state
+  const [name, setName] = useState(user?.name || '');
+  const [timezone, setTimezone] = useState(user?.timezone || 'utc');
+  const [workTime, setWorkTime] = useState(user?.preferredWorkTime || 'morning');
+
+  useEffect(() => {
+    if (user) {
+      setName(user.name || '');
+      setTimezone(user.timezone || 'utc');
+      setWorkTime(user.preferredWorkTime || 'morning');
+    }
+  }, [user]);
+
   const handleSave = async () => {
     setSaving(true);
-    // Simulate save
-    await new Promise((r) => setTimeout(r, 1000));
-    setSaving(false);
+    try {
+      const res = await fetch('/api/user/settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          timezone,
+          preferredWorkTime: workTime,
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error('Failed to save settings');
+      }
+
+      // Update the session to reflect the changes immediately
+      await updateSession({
+        ...session,
+        user: {
+          ...user,
+          name,
+          timezone,
+          preferredWorkTime: workTime,
+        },
+      });
+
+      toast.success('Настройки успешно сохранены!');
+
+    } catch (error) {
+      toast.error('Ошибка при сохранении настроек.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const user = {
-    id: 'demo',
-    name: 'Demo User',
-    email: 'demo@taskflow.app',
-    image: null,
-  };
+  if (!user) {
+    // Or a loading spinner
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -158,11 +204,11 @@ function SettingsContent() {
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <Label htmlFor="name">Имя</Label>
-                          <Input id="name" defaultValue={user.name || ''} />
+                          <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="email">Email</Label>
-                          <Input id="email" type="email" defaultValue={user.email} disabled />
+                          <Input id="email" type="email" value={user.email || ''} disabled />
                           <Badge variant="secondary" className="text-xs">
                             Основной email
                           </Badge>
@@ -171,7 +217,7 @@ function SettingsContent() {
 
                       <div className="space-y-2">
                         <Label htmlFor="timezone">Часовой пояс</Label>
-                        <Select defaultValue="utc">
+                        <Select value={timezone} onValueChange={setTimezone}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>
@@ -186,7 +232,7 @@ function SettingsContent() {
 
                       <div className="space-y-2">
                         <Label htmlFor="worktime">Предпочитаемое время работы</Label>
-                        <Select defaultValue="morning">
+                        <Select value={workTime} onValueChange={setWorkTime}>
                           <SelectTrigger>
                             <SelectValue />
                           </SelectTrigger>

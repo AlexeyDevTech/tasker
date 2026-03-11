@@ -95,7 +95,7 @@ export function TemplateSelector({ open, onOpenChange, templates, onSelect }: Te
 
   return (
     <Dialog open={open} onOpenChange={resetForm}>
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0 gap-0">
+      <DialogContent className="max-w-6xl max-h-[90vh] p-0 gap-0">
         <DialogHeader className="p-6 pb-0">
           <DialogTitle className="flex items-center gap-2 text-xl">
             <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 text-white">

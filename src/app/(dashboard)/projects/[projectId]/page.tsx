@@ -10,7 +10,6 @@ import { KanbanBoard } from '@/components/board/kanban-board';
 import { TimelineView } from '@/components/timeline/timeline-view';
 import { TaskListView } from '@/components/tasks/task-list-view';
 import { CalendarView } from '@/components/calendar/calendar-view';
-import { AIAssistant } from '@/components/ai/ai-assistant';
 import { useProjectStore } from '@/stores/project-store';
 import { useUIStore } from '@/stores/ui-store';
 import { Button } from '@/components/ui/button';
@@ -35,6 +34,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { useSession } from 'next-auth/react';
 import { format, differenceInDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import type { ViewMode } from '@/types';
@@ -81,7 +81,6 @@ export default function ProjectPage() {
   
   const { sidebarOpen, viewSettings, setViewMode } = useProjectStore();
   const { commandPaletteOpen, setCommandPaletteOpen } = useUIStore();
-  const [aiPanelOpen, setAiPanelOpen] = useState(false);
 
   // Queries
   const { data: project, isLoading: projectLoading } = useQuery({
@@ -144,15 +143,10 @@ export default function ProjectPage() {
 
   const isLoading = projectLoading || tasksLoading;
 
-  // Demo user
-  const user = {
-    id: 'demo',
-    name: 'Demo User',
-    email: 'demo@taskflow.app',
-    image: null,
-  };
+  const { data: session, status: sessionStatus } = useSession();
+  const user = session?.user;
 
-  if (projectLoading && !project) {
+  if ((projectLoading && !project) || sessionStatus === 'loading') {
     return (
       <div className="min-h-screen bg-background">
         <Sidebar projects={allProjects} />
@@ -216,13 +210,6 @@ export default function ProjectPage() {
             </div>
 
             <div className="flex items-center gap-2">
-              <Button 
-                variant="outline"
-                onClick={() => setAiPanelOpen(true)}
-              >
-                <Sparkles className="mr-2 h-4 w-4" />
-                AI Ассистент
-              </Button>
               <Button variant="outline">
                 <Settings className="h-4 w-4" />
               </Button>
@@ -273,65 +260,31 @@ export default function ProjectPage() {
             </div>
           </div>
 
-          {/* View tabs */}
-          <Tabs 
-            value={viewSettings.viewMode} 
-            onValueChange={(v) => setViewMode(v as ViewMode)}
-            className="w-full"
-          >
-            <TabsList className="mb-4">
-              <TabsTrigger value="board" className="gap-2">
-                <LayoutGrid className="h-4 w-4" />
-                Доска
-              </TabsTrigger>
-              <TabsTrigger value="timeline" className="gap-2">
-                <GanttChart className="h-4 w-4" />
-                Таймлайн
-              </TabsTrigger>
-              <TabsTrigger value="list" className="gap-2">
-                <List className="h-4 w-4" />
-                Список
-              </TabsTrigger>
-              <TabsTrigger value="calendar" className="gap-2">
-                <Calendar className="h-4 w-4" />
-                Календарь
-              </TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="board">
+          {/* View Content */}
+          <div className="mt-4">
+            {viewSettings.viewMode === 'board' && (
               <KanbanBoard 
                 tasks={tasks} 
                 onStatusChange={handleTaskStatusChange}
                 onCreateTask={handleCreateTask}
                 isLoading={isLoading}
               />
-            </TabsContent>
-
-            <TabsContent value="timeline">
+            )}
+            {viewSettings.viewMode === 'timeline' && (
               <TimelineView tasks={tasks} project={project} />
-            </TabsContent>
-
-            <TabsContent value="list">
+            )}
+            {viewSettings.viewMode === 'list' && (
               <TaskListView tasks={tasks} isLoading={isLoading} />
-            </TabsContent>
-
-            <TabsContent value="calendar">
+            )}
+            {viewSettings.viewMode === 'calendar' && (
               <CalendarView tasks={tasks} />
-            </TabsContent>
-          </Tabs>
+            )}
+          </div>
         </main>
       </div>
 
       {/* Command Palette */}
       <CommandPalette projects={allProjects} />
-
-      {/* AI Assistant Panel */}
-      <AIAssistant 
-        open={aiPanelOpen} 
-        onOpenChange={setAiPanelOpen}
-        project={project}
-        tasks={tasks}
-      />
     </div>
   );
 }

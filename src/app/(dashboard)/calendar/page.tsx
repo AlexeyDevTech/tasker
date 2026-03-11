@@ -20,6 +20,7 @@ import {
   CheckCircle2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useSession } from 'next-auth/react';
 import {
   format,
   startOfMonth,
@@ -144,12 +145,13 @@ function CalendarContent() {
     return isPast(new Date(t.dueDate)) && !isToday(new Date(t.dueDate));
   });
 
-  const user = {
-    id: 'demo',
-    name: 'Demo User',
-    email: 'demo@taskflow.app',
-    image: null,
-  };
+  const { data: session } = useSession();
+  const user = session?.user;
+
+  if (!user) {
+    // Or a loading spinner
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">

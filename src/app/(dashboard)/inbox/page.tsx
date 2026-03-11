@@ -14,6 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { useSession } from 'next-auth/react';
 import { 
   Inbox as InboxIcon, 
   Search, 
@@ -141,12 +142,13 @@ function InboxContent() {
     'no-date': '📅 Без срока',
   };
 
-  const user = {
-    id: 'demo',
-    name: 'Demo User',
-    email: 'demo@taskflow.app',
-    image: null,
-  };
+  const { data: session } = useSession();
+  const user = session?.user;
+
+  if (!user) {
+    // Or a loading spinner
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-background">

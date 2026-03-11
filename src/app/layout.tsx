@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from '@/providers/theme-provider';
+import { AuthProvider } from '@/providers/auth-provider';
 import { QueryProvider } from '@/providers/query-provider';
 import { Toaster } from '@/components/ui/sonner';
 
@@ -30,10 +31,12 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <QueryProvider>
-            {children}
-            <Toaster position="bottom-right" />
-          </QueryProvider>
+          <AuthProvider>
+            <QueryProvider>
+              {children}
+              <Toaster position="bottom-right" />
+            </QueryProvider>
+          </AuthProvider>
         </ThemeProvider>
       </body>
     </html>

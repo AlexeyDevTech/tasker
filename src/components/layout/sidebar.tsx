@@ -42,8 +42,8 @@ interface SidebarProps {
 
 export function Sidebar({ projects }: SidebarProps) {
   const pathname = usePathname();
-  const { sidebarOpen, selectedProjectId, setSelectedProjectId, setCreateProjectModalOpen } = useProjectStore();
-  const { setCommandPaletteOpen } = useUIStore();
+  const { sidebarOpen, selectedProjectId, setSelectedProjectId } = useProjectStore();
+  const { setCommandPaletteOpen, setCreateProjectModalOpen } = useUIStore();
 
   // Filter to get only root projects
   const rootProjects = projects.filter((p) => !p.parentId);

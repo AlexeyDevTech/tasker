@@ -1,6 +1,7 @@
 'use client';
 
 import { useTheme } from 'next-themes';
+import { useRouter } from 'next/navigation';
 import { useUIStore } from '@/stores/ui-store';
 import { useProjectStore } from '@/stores/project-store';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,6 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import {
   Bell,
   Menu,
@@ -27,6 +27,7 @@ import {
   List,
   Calendar,
   GanttChart,
+  LogOut,
 } from 'lucide-react';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -50,6 +51,7 @@ const viewModes: { value: ViewMode; label: string; icon: React.ComponentType<{ c
 ];
 
 export function Header({ user, projectId }: HeaderProps) {
+  const router = useRouter();
   const { theme, setTheme } = useTheme();
   const { 
     toggleSidebar, 
@@ -58,6 +60,13 @@ export function Header({ user, projectId }: HeaderProps) {
     setCreateProjectModalOpen,
   } = useProjectStore();
   const { setCommandPaletteOpen, setNotificationsPanelOpen } = useUIStore();
+  
+  const handleLogout = () => {
+    // Clear any stored session data
+    localStorage.clear();
+    // Redirect to login
+    router.push('/login');
+  };
 
   return (
     <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -190,10 +199,12 @@ export function Header({ user, projectId }: HeaderProps) {
                 <Link href="/settings/profile">Профиль</Link>
               </DropdownMenuItem>
               <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <Link href="/api/auth/signout" className="text-destructive">
-                  Выйти
-                </Link>
+              <DropdownMenuItem 
+                onClick={handleLogout}
+                className="text-destructive cursor-pointer"
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Выйти
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

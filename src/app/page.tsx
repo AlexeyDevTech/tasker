@@ -10,13 +10,23 @@ import { CommandPalette } from '@/components/layout/command-palette';
 import { ProjectCard } from '@/components/projects/project-card';
 import { TemplateSelector } from '@/components/projects/template-selector';
 import { BulkImportForm } from '@/components/projects/bulk-import-form';
+import { QuickTaskCreate } from '@/components/tasks/quick-task-create';
 import { type ParsedProject } from '@/lib/bulk-parser';
 import { useProjectStore } from '@/stores/project-store';
 import { useUIStore } from '@/stores/ui-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { 
   Plus, 
   Search, 
@@ -26,9 +36,28 @@ import {
   Sparkles,
   ArrowRight,
   Upload,
+  CheckCircle2,
+  Clock,
+  TrendingUp,
+  Calendar,
+  MoreHorizontal,
+  Target,
+  Zap,
+  Briefcase,
+  ChevronRight,
+  Star,
+  Play,
+  Pause,
+  CheckSquare,
+  Timer,
+  Activity,
+  FileText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { format, isToday, isTomorrow, isPast, addDays } from 'date-fns';
+import { ru } from 'date-fns/locale';
+import Link from 'next/link';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -44,6 +73,14 @@ const queryClient = new QueryClient({
 async function fetchProjects() {
   const res = await fetch('/api/projects');
   if (!res.ok) throw new Error('Failed to fetch projects');
+  const data = await res.json();
+  return data.data || [];
+}
+
+// Fetch all tasks
+async function fetchTasks() {
+  const res = await fetch('/api/tasks');
+  if (!res.ok) throw new Error('Failed to fetch tasks');
   const data = await res.json();
   return data.data || [];
 }
@@ -73,6 +110,23 @@ async function createProject(data: {
   return res.json();
 }
 
+// Create task
+async function createTask(data: {
+  title: string;
+  description?: string;
+  priority: 'low' | 'medium' | 'high';
+  dueDate?: Date;
+  projectId?: string;
+}) {
+  const res = await fetch('/api/tasks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error('Failed to create task');
+  return res.json();
+}
+
 // Bulk create projects
 async function bulkCreateProjects(data: ParsedProject[]) {
   const res = await fetch('/api/projects/bulk', {
@@ -83,6 +137,17 @@ async function bulkCreateProjects(data: ParsedProject[]) {
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({ message: 'Failed to bulk create projects' }));
     throw new Error(errorData.message);
+  }
+  return res.json();
+}
+
+// Delete project
+async function deleteProject(id: string) {
+  const res = await fetch(`/api/projects/${id}`, {
+    method: 'DELETE',
+  });
+  if (!res.ok) {
+    throw new Error('Failed to delete project');
   }
   return res.json();
 }
@@ -98,7 +163,7 @@ function DashboardContent() {
 
   const queryClient = useQueryClient();
   const { sidebarOpen } = useProjectStore();
-  const { createProjectModalOpen, setCreateProjectModalOpen } = useUIStore();
+  const { createProjectModalOpen, setCreateProjectModalOpen, createTaskModalOpen, setCreateTaskModalOpen } = useUIStore();
   const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
   
   const [searchQuery, setSearchQuery] = useState('');
@@ -108,7 +173,13 @@ function DashboardContent() {
   const { data: projects = [], isLoading: isLoadingProjects } = useQuery({
     queryKey: ['projects'],
     queryFn: fetchProjects,
-    enabled: status === 'authenticated', // Only fetch if authenticated
+    enabled: status === 'authenticated',
+  });
+
+  const { data: allTasks = [], isLoading: isLoadingTasks } = useQuery({
+    queryKey: ['all-tasks'],
+    queryFn: fetchTasks,
+    enabled: status === 'authenticated',
   });
 
   const { data: templates = [] } = useQuery({
@@ -130,6 +201,19 @@ function DashboardContent() {
     },
   });
   
+  const createTaskMutation = useMutation({
+    mutationFn: createTask,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      queryClient.invalidateQueries({ queryKey: ['all-tasks'] });
+      toast.success('Задача успешно создана!');
+      setCreateTaskModalOpen(false);
+    },
+    onError: (error) => {
+      toast.error(`Ошибка при создании задачи: ${error.message}`);
+    },
+  });
+
   const bulkCreateMutation = useMutation({
     mutationFn: bulkCreateProjects,
     onSuccess: (data) => {
@@ -142,6 +226,41 @@ function DashboardContent() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: deleteProject,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      toast.success('Проект успешно удален!');
+    },
+    onError: (error) => {
+      toast.error(`Ошибка при удалении проекта: ${error.message}`);
+    },
+  });
+
+  // Calculate stats
+  const activeProjects = projects.filter((p: any) => p.status === 'active');
+  const completedProjects = projects.filter((p: any) => p.status === 'completed');
+  const archivedProjects = projects.filter((p: any) => p.status === 'archived');
+
+  // Task stats
+  const todoTasks = allTasks.filter((t: any) => t.status === 'todo');
+  const inProgressTasks = allTasks.filter((t: any) => t.status === 'in_progress');
+  const doneTasks = allTasks.filter((t: any) => t.status === 'done');
+  const overdueTasks = allTasks.filter((t: any) => 
+    t.dueDate && isPast(new Date(t.dueDate)) && t.status !== 'done'
+  );
+  const todayTasks = allTasks.filter((t: any) => 
+    t.dueDate && isToday(new Date(t.dueDate))
+  );
+  const upcomingTasks = allTasks.filter((t: any) => 
+    t.dueDate && (isTomorrow(new Date(t.dueDate)) || 
+    (new Date(t.dueDate) > new Date() && new Date(t.dueDate) <= addDays(new Date(), 7)))
+  );
+
+  // Recent projects (last 5)
+  const recentProjects = [...activeProjects]
+    .sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
+    .slice(0, 5);
 
   // Filter projects
   const filteredProjects = projects.filter((p: any) => 
@@ -149,33 +268,55 @@ function DashboardContent() {
     p.description?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const activeProjects = filteredProjects.filter((p: any) => p.status === 'active');
-  const completedProjects = filteredProjects.filter((p: any) => p.status === 'completed');
-  const archivedProjects = filteredProjects.filter((p: any) => p.status === 'archived');
+  const filteredActive = filteredProjects.filter((p: any) => p.status === 'active');
+  const filteredCompleted = filteredProjects.filter((p: any) => p.status === 'completed');
+  const filteredArchived = filteredProjects.filter((p: any) => p.status === 'archived');
 
   const handleCreateProject = (data: any) => {
     createMutation.mutate(data);
+  };
+
+  const handleCreateTask = (data: any) => {
+    createTaskMutation.mutate(data);
   };
 
   const handleBulkImport = (data: ParsedProject[]) => {
     bulkCreateMutation.mutate(data);
   };
 
+  const handleDeleteProject = (id: string) => {
+    deleteMutation.mutate(id);
+  };
+
+  const handleEditProject = (id: string) => {
+    toast.info('Функция редактирования в разработке.');
+  };
+
+  // Greeting based on time
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Доброе утро';
+    if (hour < 18) return 'Добрый день';
+    return 'Добрый вечер';
+  };
+
   if (status === 'loading' || !session?.user) {
     return (
-      <div className="p-6">
-        <Skeleton className="h-10 w-48 mb-8" />
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-        </div>
-        <Skeleton className="h-10 w-full mb-6" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Skeleton className="h-40" />
-          <Skeleton className="h-40" />
-          <Skeleton className="h-40" />
+      <div className="min-h-screen bg-background">
+        <div className="p-6 lg:p-8 space-y-8">
+          <div className="space-y-4">
+            <Skeleton className="h-10 w-64" />
+            <Skeleton className="h-6 w-96" />
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <Skeleton key={i} className="h-32 rounded-2xl" />
+            ))}
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <Skeleton className="h-80 rounded-2xl lg:col-span-2" />
+            <Skeleton className="h-80 rounded-2xl" />
+          </div>
         </div>
       </div>
     );
@@ -193,122 +334,450 @@ function DashboardContent() {
       )}>
         <Header user={user} />
         
-        <main className="p-6">
-          <div className="mb-8">
-            <h1 className="text-3xl font-bold mb-2">
-              Добро пожаловать, {user.name}! 👋
-            </h1>
-            <p className="text-muted-foreground">
-              Управляйте проектами, задачами и командой в одном месте.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
-            <button
-              onClick={() => setCreateProjectModalOpen(true)}
-              className="flex items-center gap-4 p-4 rounded-xl border border-border bg-gradient-to-r from-violet-500/10 to-purple-500/10 hover:from-violet-500/20 hover:to-purple-500/20 transition-all group"
-            >
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-white">
-                <Plus className="h-6 w-6" />
-              </div>
-              <div className="text-left">
-                <p className="font-semibold">Новый проект</p>
-                <p className="text-sm text-muted-foreground">Создать с шаблоном или с нуля</p>
-              </div>
-              <ArrowRight className="ml-auto h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
-            </button>
-
-            <button
-              onClick={() => setIsBulkImportOpen(true)}
-              className="flex items-center gap-4 p-4 rounded-xl border border-border bg-gradient-to-r from-sky-500/10 to-blue-500/10 hover:from-sky-500/20 hover:to-blue-500/20 transition-all group"
-            >
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-sky-500 to-blue-600 flex items-center justify-center text-white">
-                <Upload className="h-6 w-6" />
-              </div>
-              <div className="text-left">
-                <p className="font-semibold">Импорт из текста</p>
-                <p className="text-sm text-muted-foreground">Массовое создание задач</p>
-              </div>
-              <ArrowRight className="ml-auto h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
-            </button>
-
-            <button className="flex items-center gap-4 p-4 rounded-xl border border-border bg-gradient-to-r from-emerald-500/10 to-teal-500/10 hover:from-emerald-500/20 hover:to-teal-500/20 transition-all group">
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center text-white">
-                <FolderOpen className="h-6 w-6" />
-              </div>
-              <div className="text-left">
-                <p className="font-semibold">Шаблоны</p>
-                <p className="text-sm text-muted-foreground">Готовые структуры проектов</p>
-              </div>
-              <ArrowRight className="ml-auto h-5 w-5 text-muted-foreground group-hover:translate-x-1 transition-transform" />
-            </button>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Поиск проектов..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
-              />
+        <main className="p-6 lg:p-8 space-y-8">
+          {/* Welcome Section */}
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-2xl lg:text-3xl font-bold mb-1">
+                {getGreeting()}, {user.name?.split(' ')[0] || 'Пользователь'}! 👋
+              </h1>
+              <p className="text-muted-foreground">
+                У вас {todoTasks.length} задач на сегодня. {overdueTasks.length > 0 && (
+                  <span className="text-destructive font-medium">{overdueTasks.length} просрочено.</span>
+                )}
+              </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Button
-                variant={viewType === 'grid' ? 'default' : 'outline'}
-                size="icon"
-                onClick={() => setViewType('grid')}
+            <div className="flex items-center gap-3">
+              <Button 
+                variant="outline" 
+                className="gap-2"
+                onClick={() => setCreateTaskModalOpen(true)}
               >
-                <LayoutGrid className="h-4 w-4" />
+                <CheckSquare className="h-4 w-4" />
+                Новая задача
               </Button>
-              <Button
-                variant={viewType === 'list' ? 'default' : 'outline'}
-                size="icon"
-                onClick={() => setViewType('list')}
+              <Button 
+                className="gap-2 shadow-lg shadow-primary/20"
+                onClick={() => setCreateProjectModalOpen(true)}
               >
-                <List className="h-4 w-4" />
+                <Plus className="h-4 w-4" />
+                Новый проект
               </Button>
             </div>
           </div>
 
-          <Tabs defaultValue="active" className="w-full">
-            <TabsList className="mb-4">
-              <TabsTrigger value="active">Активные ({activeProjects.length})</TabsTrigger>
-              <TabsTrigger value="completed">Завершённые ({completedProjects.length})</TabsTrigger>
-              <TabsTrigger value="archived">Архив ({archivedProjects.length})</TabsTrigger>
-            </TabsList>
+          {/* Stats Cards */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5 hover:border-primary/30 transition-all duration-300 hover:shadow-lg">
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <Briefcase className="h-5 w-5 text-primary" />
+                  </div>
+                  <TrendingUp className="h-4 w-4 text-emerald-500" />
+                </div>
+                <p className="text-3xl font-bold">{activeProjects.length}</p>
+                <p className="text-sm text-muted-foreground">Активных проектов</p>
+              </div>
+            </div>
 
-            <TabsContent value="active">
-              {isLoadingProjects ? (
-                <div className={cn("grid gap-4", viewType === 'grid' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1")}>
-                  {[1, 2, 3].map((i) => (
-                    <div key={i} className="rounded-xl border border-border p-4"><Skeleton className="h-6 w-1/2 mb-2" /><Skeleton className="h-4 w-3/4 mb-4" /><Skeleton className="h-2 w-full" /></div>
-                  ))}
+            <div className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5 hover:border-amber-500/30 transition-all duration-300 hover:shadow-lg">
+              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
+                    <Timer className="h-5 w-5 text-amber-500" />
+                  </div>
+                  {inProgressTasks.length > 0 && (
+                    <Badge variant="secondary" className="bg-amber-500/10 text-amber-600">
+                      В работе
+                    </Badge>
+                  )}
                 </div>
-              ) : activeProjects.length === 0 ? (
-                <div className="text-center py-12">
-                  <div className="h-16 w-16 mx-auto mb-4 rounded-full bg-muted flex items-center justify-center"><FolderOpen className="h-8 w-8 text-muted-foreground" /></div>
-                  <h3 className="text-lg font-medium mb-1">Нет активных проектов</h3>
-                  <p className="text-muted-foreground mb-4">Создайте первый проект, чтобы начать работу</p>
-                  <Button onClick={() => setCreateProjectModalOpen(true)}><Plus className="mr-2 h-4 w-4" />Создать проект</Button>
-                </div>
-              ) : (
-                <div className={cn("grid gap-4", viewType === 'grid' ? "grid-cols-1 md:grid-cols-2 lg:grid-cols-3" : "grid-cols-1")}>
-                  {activeProjects.map((project: any) => (<ProjectCard key={project.id} project={project} />))}
-                </div>
-              )}
-            </TabsContent>
-            
-            {/* Other Tabs Content... */}
+                <p className="text-3xl font-bold">{inProgressTasks.length}</p>
+                <p className="text-sm text-muted-foreground">В процессе</p>
+              </div>
+            </div>
 
-          </Tabs>
+            <div className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5 hover:border-emerald-500/30 transition-all duration-300 hover:shadow-lg">
+              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
+                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
+                  </div>
+                  {doneTasks.length > 0 && (
+                    <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600">
+                      Готово
+                    </Badge>
+                  )}
+                </div>
+                <p className="text-3xl font-bold">{doneTasks.length}</p>
+                <p className="text-sm text-muted-foreground">Выполнено</p>
+              </div>
+            </div>
+
+            <div className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5 hover:border-rose-500/30 transition-all duration-300 hover:shadow-lg">
+              <div className="absolute inset-0 bg-gradient-to-br from-rose-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="relative">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="h-10 w-10 rounded-xl bg-rose-500/10 flex items-center justify-center">
+                    <Clock className="h-5 w-5 text-rose-500" />
+                  </div>
+                </div>
+                <p className="text-3xl font-bold text-rose-500">{overdueTasks.length}</p>
+                <p className="text-sm text-muted-foreground">Просрочено</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Content Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Projects List */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* Quick Actions */}
+              <div className="flex flex-wrap gap-3">
+                <button
+                  onClick={() => setCreateProjectModalOpen(true)}
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/50 bg-card hover:bg-accent hover:border-primary/30 transition-all duration-200 group"
+                >
+                  <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Plus className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium text-sm">Новый проект</p>
+                    <p className="text-xs text-muted-foreground">С шаблоном или с нуля</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => setIsBulkImportOpen(true)}
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/50 bg-card hover:bg-accent hover:border-sky-500/30 transition-all duration-200 group"
+                >
+                  <div className="h-9 w-9 rounded-lg bg-sky-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <Upload className="h-4 w-4 text-sky-500" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium text-sm">Импорт</p>
+                    <p className="text-xs text-muted-foreground">Из текста</p>
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => setCreateTaskModalOpen(true)}
+                  className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/50 bg-card hover:bg-accent hover:border-emerald-500/30 transition-all duration-200 group"
+                >
+                  <div className="h-9 w-9 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <CheckSquare className="h-4 w-4 text-emerald-500" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-medium text-sm">Быстрая задача</p>
+                    <p className="text-xs text-muted-foreground">Создать за секунду</p>
+                  </div>
+                </button>
+              </div>
+
+              {/* Search and View Toggle */}
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Поиск проектов..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 h-10 bg-muted/30"
+                  />
+                </div>
+                <div className="flex items-center gap-1 p-1 rounded-lg border border-border/50 bg-muted/30">
+                  <Button
+                    variant={viewType === 'grid' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setViewType('grid')}
+                    className="h-8"
+                  >
+                    <LayoutGrid className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant={viewType === 'list' ? 'default' : 'ghost'}
+                    size="sm"
+                    onClick={() => setViewType('list')}
+                    className="h-8"
+                  >
+                    <List className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Projects Tabs */}
+              <Tabs defaultValue="active" className="w-full">
+                <TabsList className="bg-muted/30 p-1 rounded-xl h-auto">
+                  <TabsTrigger value="active" className="rounded-lg gap-2">
+                    <Play className="h-3.5 w-3.5" />
+                    Активные
+                    <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                      {filteredActive.length}
+                    </Badge>
+                  </TabsTrigger>
+                  <TabsTrigger value="completed" className="rounded-lg gap-2">
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                    Завершённые
+                    <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                      {filteredCompleted.length}
+                    </Badge>
+                  </TabsTrigger>
+                  <TabsTrigger value="archived" className="rounded-lg gap-2">
+                    <Pause className="h-3.5 w-3.5" />
+                    Архив
+                    <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                      {filteredArchived.length}
+                    </Badge>
+                  </TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="active" className="mt-4">
+                  {isLoadingProjects ? (
+                    <div className={cn(
+                      "grid gap-4",
+                      viewType === 'grid' ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
+                    )}>
+                      {[1, 2, 3, 4].map((i) => (
+                        <Skeleton key={i} className="h-40 rounded-xl" />
+                      ))}
+                    </div>
+                  ) : filteredActive.length === 0 ? (
+                    <div className="text-center py-12 px-4 rounded-2xl border-2 border-dashed border-border/50">
+                      <div className="h-16 w-16 mx-auto mb-4 rounded-2xl bg-muted flex items-center justify-center">
+                        <FolderOpen className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                      <h3 className="font-semibold mb-1">Нет активных проектов</h3>
+                      <p className="text-sm text-muted-foreground mb-4 max-w-sm mx-auto">
+                        Создайте первый проект, чтобы начать работу
+                      </p>
+                      <Button onClick={() => setCreateProjectModalOpen(true)} className="gap-2">
+                        <Plus className="h-4 w-4" />
+                        Создать проект
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className={cn(
+                      "grid gap-4",
+                      viewType === 'grid' ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
+                    )}>
+                      {filteredActive.map((project: any) => (
+                        <ProjectCard 
+                          key={project.id} 
+                          project={project} 
+                          onEdit={() => handleEditProject(project.id)} 
+                          onDelete={() => handleDeleteProject(project.id)} 
+                        />
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="completed" className="mt-4">
+                  {filteredCompleted.length === 0 ? (
+                    <div className="text-center py-12 px-4 rounded-2xl border-2 border-dashed border-border/50">
+                      <div className="h-16 w-16 mx-auto mb-4 rounded-2xl bg-emerald-500/10 flex items-center justify-center">
+                        <CheckCircle2 className="h-8 w-8 text-emerald-500" />
+                      </div>
+                      <h3 className="font-semibold mb-1">Нет завершённых проектов</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Завершённые проекты появятся здесь
+                      </p>
+                    </div>
+                  ) : (
+                    <div className={cn(
+                      "grid gap-4",
+                      viewType === 'grid' ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
+                    )}>
+                      {filteredCompleted.map((project: any) => (
+                        <ProjectCard 
+                          key={project.id} 
+                          project={project} 
+                          onEdit={() => handleEditProject(project.id)} 
+                          onDelete={() => handleDeleteProject(project.id)} 
+                        />
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+
+                <TabsContent value="archived" className="mt-4">
+                  {filteredArchived.length === 0 ? (
+                    <div className="text-center py-12 px-4 rounded-2xl border-2 border-dashed border-border/50">
+                      <div className="h-16 w-16 mx-auto mb-4 rounded-2xl bg-muted flex items-center justify-center">
+                        <Pause className="h-8 w-8 text-muted-foreground" />
+                      </div>
+                      <h3 className="font-semibold mb-1">Нет архивных проектов</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Архивные проекты появятся здесь
+                      </p>
+                    </div>
+                  ) : (
+                    <div className={cn(
+                      "grid gap-4",
+                      viewType === 'grid' ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"
+                    )}>
+                      {filteredArchived.map((project: any) => (
+                        <ProjectCard 
+                          key={project.id} 
+                          project={project} 
+                          onEdit={() => handleEditProject(project.id)} 
+                          onDelete={() => handleDeleteProject(project.id)} 
+                        />
+                      ))}
+                    </div>
+                  )}
+                </TabsContent>
+              </Tabs>
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-6">
+              {/* Upcoming Tasks */}
+              <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+                <div className="p-4 border-b border-border/50 bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <Calendar className="h-4 w-4 text-primary" />
+                      Ближайшие задачи
+                    </h3>
+                    <Badge variant="secondary" className="text-xs">
+                      {todayTasks.length + upcomingTasks.length}
+                    </Badge>
+                  </div>
+                </div>
+                <ScrollArea className="h-72">
+                  {todayTasks.length === 0 && upcomingTasks.length === 0 ? (
+                    <div className="p-4 text-center text-sm text-muted-foreground">
+                      <CheckCircle2 className="h-8 w-8 mx-auto mb-2 text-emerald-500" />
+                      <p>Нет предстоящих задач</p>
+                    </div>
+                  ) : (
+                    <div className="p-2">
+                      {todayTasks.slice(0, 3).map((task: any) => (
+                        <Link
+                          key={task.id}
+                          href={`/projects/${task.projectId}`}
+                          className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors group"
+                        >
+                          <div className="h-6 w-6 rounded-full bg-amber-500/10 flex items-center justify-center mt-0.5">
+                            <span className="text-xs">☀️</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                              {task.title}
+                            </p>
+                            <p className="text-xs text-muted-foreground">Сегодня</p>
+                          </div>
+                        </Link>
+                      ))}
+                      {upcomingTasks.slice(0, 5).map((task: any) => (
+                        <Link
+                          key={task.id}
+                          href={`/projects/${task.projectId}`}
+                          className="flex items-start gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors group"
+                        >
+                          <div className="h-6 w-6 rounded-full bg-primary/10 flex items-center justify-center mt-0.5">
+                            <Clock className="h-3 w-3 text-primary" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                              {task.title}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {format(new Date(task.dueDate), 'd MMM', { locale: ru })}
+                            </p>
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+              </div>
+
+              {/* Recent Projects */}
+              <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
+                <div className="p-4 border-b border-border/50 bg-muted/30">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-primary" />
+                      Недавние проекты
+                    </h3>
+                  </div>
+                </div>
+                <div className="p-2">
+                  {recentProjects.length === 0 ? (
+                    <div className="p-4 text-center text-sm text-muted-foreground">
+                      <FolderOpen className="h-8 w-8 mx-auto mb-2" />
+                      <p>Нет недавних проектов</p>
+                    </div>
+                  ) : (
+                    recentProjects.map((project: any) => (
+                      <Link
+                        key={project.id}
+                        href={`/projects/${project.id}`}
+                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors group"
+                      >
+                        <div 
+                          className="h-8 w-8 rounded-lg flex items-center justify-center text-sm"
+                          style={{ backgroundColor: `${project.color || '#6366f1'}20` }}
+                        >
+                          {project.icon || '📁'}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
+                            {project.name}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
+                            {project._count?.tasks || 0} задач
+                          </p>
+                        </div>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
+                      </Link>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Quick Stats */}
+              <div className="rounded-2xl border border-border/50 bg-gradient-to-br from-primary/5 via-primary/3 to-transparent p-4">
+                <div className="flex items-center gap-2 mb-3">
+                  <Zap className="h-4 w-4 text-primary" />
+                  <h3 className="font-semibold">Прогресс</h3>
+                </div>
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex items-center justify-between text-sm mb-1">
+                      <span className="text-muted-foreground">Выполнено задач</span>
+                      <span className="font-medium">{allTasks.length > 0 ? Math.round((doneTasks.length / allTasks.length) * 100) : 0}%</span>
+                    </div>
+                    <Progress value={allTasks.length > 0 ? (doneTasks.length / allTasks.length) * 100 : 0} className="h-2" />
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Всего задач</span>
+                    <span className="font-medium">{allTasks.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Проектов</span>
+                    <span className="font-medium">{projects.length}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </main>
       </div>
 
       <CommandPalette projects={projects} />
       <TemplateSelector open={createProjectModalOpen} onOpenChange={setCreateProjectModalOpen} templates={templates} onSelect={handleCreateProject} />
       <BulkImportForm open={isBulkImportOpen} onOpenChange={setIsBulkImportOpen} onImport={handleBulkImport} />
+      <QuickTaskCreate 
+        onTaskCreate={handleCreateTask}
+        projects={projects}
+      />
     </div>
   );
 }

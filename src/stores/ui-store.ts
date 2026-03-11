@@ -22,6 +22,9 @@ interface UIState {
   createProjectModalOpen: boolean;
   setCreateProjectModalOpen: (open: boolean) => void;
   
+  createTaskModalOpen: boolean;
+  setCreateTaskModalOpen: (open: boolean) => void;
+  
   // Toast queue
   toasts: Toast[];
   addToast: (toast: Omit<Toast, 'id'>) => void;
@@ -65,6 +68,9 @@ export const useUIStore = create<UIState>()(
       // Modals
       createProjectModalOpen: false,
       setCreateProjectModalOpen: (open) => set({ createProjectModalOpen: open }),
+      
+      createTaskModalOpen: false,
+      setCreateTaskModalOpen: (open) => set({ createTaskModalOpen: open }),
       
       // Toast queue
       toasts: [],

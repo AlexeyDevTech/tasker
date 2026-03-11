@@ -50,24 +50,38 @@ export async function POST(req: Request) {
     let createdProjectsCount = 0;
     let createdTasksCount = 0;
 
+    let updatedProjectsCount = 0;
+
     await db.$transaction(async (prisma) => {
       for (const project of projectsToCreate) {
-        createdProjectsCount++;
-        const createdProject = await prisma.project.create({
-          data: {
+        // Find existing project or create a new one
+        let existingProject = await prisma.project.findFirst({
+          where: {
             name: project.name,
             ownerId: userId,
           },
         });
 
+        if (existingProject) {
+          updatedProjectsCount++;
+        } else {
+          createdProjectsCount++;
+          existingProject = await prisma.project.create({
+            data: {
+              name: project.name,
+              ownerId: userId,
+            },
+          });
+        }
+
         if (project.tasks && project.tasks.length > 0) {
-          createdTasksCount += await createTasksRecursive(prisma as unknown as PrismaClient, project.tasks, createdProject.id, userId);
+          createdTasksCount += await createTasksRecursive(prisma as unknown as PrismaClient, project.tasks, existingProject.id, userId);
         }
       }
     });
 
     return NextResponse.json({
-      message: `Successfully created ${createdProjectsCount} projects and ${createdTasksCount} tasks.`,
+      message: `Successfully created ${createdProjectsCount} and updated ${updatedProjectsCount} projects, adding ${createdTasksCount} tasks.`,
     });
 
   } catch (error) {

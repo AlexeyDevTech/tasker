@@ -26,6 +26,7 @@ import {
   Search,
   HelpCircle,
   Sparkles,
+  Zap,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -51,39 +52,45 @@ export function Sidebar({ projects }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 z-40 h-screen border-r border-border bg-background transition-all duration-300',
+        'fixed left-0 top-0 z-40 h-screen border-r border-border/50 bg-gradient-to-b from-sidebar to-sidebar/95 backdrop-blur-xl transition-all duration-300',
         sidebarOpen ? 'w-64' : 'w-0 overflow-hidden'
       )}
     >
       <div className="flex h-full flex-col">
-        {/* Logo */}
-        <div className="flex h-14 items-center justify-between border-b border-border px-4">
-          <Link href="/" className="flex items-center gap-2 font-semibold text-lg">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-gradient-to-br from-violet-500 to-purple-600 text-white">
-              <Sparkles className="h-4 w-4" />
+        {/* Logo with enhanced design */}
+        <div className="flex h-16 items-center justify-between border-b border-border/50 px-4">
+          <Link href="/" className="flex items-center gap-3 group">
+            <div className="relative flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary via-primary to-primary/80 text-white shadow-lg shadow-primary/25 transition-transform duration-300 group-hover:scale-110">
+              <Sparkles className="h-4.5 w-4.5" />
+              <div className="absolute inset-0 rounded-xl bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
-            <span className="bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent font-bold">
-              TaskFlow
-            </span>
+            <div className="flex flex-col">
+              <span className="bg-gradient-to-r from-primary via-primary/90 to-primary/80 bg-clip-text text-transparent font-bold text-lg leading-tight">
+                TaskFlow
+              </span>
+              <span className="text-[10px] text-muted-foreground font-medium -mt-0.5">Project Manager</span>
+            </div>
           </Link>
         </div>
 
-        {/* Search */}
+        {/* Enhanced Search */}
         <div className="p-3">
           <button
             onClick={() => setCommandPaletteOpen(true)}
-            className="flex w-full items-center gap-2 rounded-lg border border-border bg-muted/50 px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors"
+            className="group flex w-full items-center gap-3 rounded-xl border border-border/60 bg-muted/30 hover:bg-muted/50 hover:border-primary/30 px-3.5 py-2.5 text-sm transition-all duration-200"
           >
-            <Search className="h-4 w-4" />
-            <span>Поиск...</span>
-            <kbd className="ml-auto rounded bg-muted px-1.5 py-0.5 text-xs font-mono">⌘K</kbd>
+            <Search className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
+            <span className="text-muted-foreground">Поиск...</span>
+            <kbd className="ml-auto rounded-md bg-background/80 px-2 py-0.5 text-[10px] font-mono text-muted-foreground border border-border/50 shadow-sm">
+              ⌘K
+            </kbd>
           </button>
         </div>
 
-        <Separator />
+        <Separator className="mx-3" />
 
         {/* Navigation */}
-        <ScrollArea className="flex-1 px-3 py-2">
+        <ScrollArea className="flex-1 px-3 py-3">
           <nav className="space-y-1">
             <NavItem
               href="/"
@@ -96,6 +103,7 @@ export function Sidebar({ projects }: SidebarProps) {
               icon={Inbox}
               label="Входящие"
               active={pathname === '/inbox'}
+              badge={3}
             />
             <NavItem
               href="/calendar"
@@ -108,18 +116,18 @@ export function Sidebar({ projects }: SidebarProps) {
           <Separator className="my-4" />
 
           {/* Projects Section */}
-          <div className="space-y-1">
+          <div className="space-y-2">
             <div className="flex items-center justify-between px-2 py-1.5">
-              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground/80">
                 Проекты
               </span>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6"
+                className="h-6 w-6 hover:bg-primary/10 hover:text-primary transition-colors"
                 onClick={() => setCreateProjectModalOpen(true)}
               >
-                <Plus className="h-4 w-4" />
+                <Plus className="h-3.5 w-3.5" />
               </Button>
             </div>
 
@@ -135,12 +143,29 @@ export function Sidebar({ projects }: SidebarProps) {
                 />
               ))}
             </div>
+
+            {rootProjects.length === 0 && (
+              <div className="px-2 py-4 text-center">
+                <div className="mx-auto mb-2 h-10 w-10 rounded-full bg-muted/50 flex items-center justify-center">
+                  <Folder className="h-5 w-5 text-muted-foreground/60" />
+                </div>
+                <p className="text-xs text-muted-foreground">Нет проектов</p>
+                <Button 
+                  variant="link" 
+                  size="sm" 
+                  className="h-auto p-0 mt-1 text-primary"
+                  onClick={() => setCreateProjectModalOpen(true)}
+                >
+                  Создать первый
+                </Button>
+              </div>
+            )}
           </div>
         </ScrollArea>
 
-        <Separator />
+        <Separator className="mx-3" />
 
-        {/* Footer */}
+        {/* Footer with enhanced styling */}
         <div className="p-3 space-y-1">
           <NavItem
             href="/settings"
@@ -154,6 +179,20 @@ export function Sidebar({ projects }: SidebarProps) {
             label="Справка"
             active={pathname === '/help'}
           />
+          
+          {/* Pro banner */}
+          <div className="mt-3 rounded-xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border border-primary/20 p-3">
+            <div className="flex items-center gap-2 mb-1.5">
+              <Zap className="h-4 w-4 text-primary" />
+              <span className="text-xs font-semibold">Pro версия</span>
+            </div>
+            <p className="text-[10px] text-muted-foreground mb-2">
+              AI-ассистент и расширенные функции
+            </p>
+            <Button size="sm" className="w-full h-7 text-xs bg-primary/90 hover:bg-primary">
+              Подробнее
+            </Button>
+          </div>
         </div>
       </div>
     </aside>
@@ -165,21 +204,34 @@ interface NavItemProps {
   icon: React.ComponentType<{ className?: string }>;
   label: string;
   active?: boolean;
+  badge?: number;
 }
 
-function NavItem({ href, icon: Icon, label, active }: NavItemProps) {
+function NavItem({ href, icon: Icon, label, active, badge }: NavItemProps) {
   return (
     <Link
       href={href}
       className={cn(
-        'flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors',
+        'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
         active
-          ? 'bg-primary/10 text-primary font-medium'
-          : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+          ? 'bg-primary/10 text-primary shadow-sm'
+          : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'
       )}
     >
-      <Icon className="h-4 w-4" />
-      <span>{label}</span>
+      <div className={cn(
+        "flex h-7 w-7 items-center justify-center rounded-lg transition-colors",
+        active 
+          ? "bg-primary/15 text-primary" 
+          : "bg-muted/50 text-muted-foreground group-hover:bg-muted group-hover:text-foreground"
+      )}>
+        <Icon className="h-4 w-4" />
+      </div>
+      <span className="flex-1">{label}</span>
+      {badge !== undefined && badge > 0 && (
+        <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
+          {badge}
+        </span>
+      )}
     </Link>
   );
 }
@@ -209,40 +261,45 @@ function ProjectItem({ project, allProjects, selectedId, onSelect, level }: Proj
   return (
     <Collapsible open={isOpen} onOpenChange={setIsOpen}>
       <div className="flex items-center">
-        {hasChildren && (
-          <CollapsibleTrigger asChild>
-            <button className="flex h-7 w-6 items-center justify-center text-muted-foreground hover:text-foreground">
-              {isOpen ? (
-                <ChevronDown className="h-3 w-3" />
-              ) : (
-                <ChevronRight className="h-3 w-3" />
-              )}
-            </button>
-          </CollapsibleTrigger>
-        )}
-        
         <Link
           href={`/projects/${project.id}`}
           className={cn(
-            'flex flex-1 items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors',
+            'group flex flex-1 items-center gap-2.5 rounded-lg px-2 py-2 text-sm transition-all duration-200',
             isActive
-              ? 'bg-primary/10 text-primary font-medium'
-              : 'text-muted-foreground hover:bg-muted hover:text-foreground',
-            level > 0 && 'ml-2'
+              ? 'bg-primary/10 text-primary font-medium shadow-sm'
+              : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground',
+            level > 0 && 'ml-3'
           )}
-          style={{ paddingLeft: `${level * 12 + 8}px` }}
         >
           <div
-            className="h-3 w-3 rounded-sm flex-shrink-0"
+            className="h-3.5 w-3.5 rounded-md flex-shrink-0 shadow-sm transition-transform group-hover:scale-110"
             style={{ backgroundColor: project.color }}
           />
-          <span className="truncate">{project.icon || ''} {project.name}</span>
+          <span className="truncate flex-1">{project.icon || ''} {project.name}</span>
+          {hasChildren && (
+            <CollapsibleTrigger asChild onClick={(e) => e.preventDefault()}>
+              <button 
+                className="flex h-5 w-5 items-center justify-center rounded hover:bg-muted transition-colors"
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsOpen(!isOpen);
+                }}
+              >
+                {isOpen ? (
+                  <ChevronDown className="h-3 w-3" />
+                ) : (
+                  <ChevronRight className="h-3 w-3" />
+                )}
+              </button>
+            </CollapsibleTrigger>
+          )}
         </Link>
       </div>
 
       {hasChildren && (
         <CollapsibleContent>
-          <div className="space-y-0.5">
+          <div className="space-y-0.5 mt-0.5">
             {children.map((child) => (
               <ProjectItem
                 key={child.id}

@@ -1,14 +1,50 @@
+
 'use client';
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Calendar, CheckCircle2, Clock, MessageSquare } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
+import { MoreHorizontal, Calendar, CheckCircle2, MessageSquare, GripVertical, Clock } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+import { format, isPast, isToday } from 'date-fns';
 import { ru } from 'date-fns/locale';
+
+const priorityConfig: Record<string, { bg: string; text: string; dot: string; label: string }> = {
+  low: { 
+    bg: 'bg-slate-100 dark:bg-slate-800/50', 
+    text: 'text-slate-600 dark:text-slate-400',
+    dot: 'bg-slate-400',
+    label: 'Низкий'
+  },
+  medium: { 
+    bg: 'bg-blue-100 dark:bg-blue-900/30', 
+    text: 'text-blue-700 dark:text-blue-400',
+    dot: 'bg-blue-500',
+    label: 'Средний'
+  },
+  high: { 
+    bg: 'bg-amber-100 dark:bg-amber-900/30', 
+    text: 'text-amber-700 dark:text-amber-400',
+    dot: 'bg-amber-500',
+    label: 'Высокий'
+  },
+  urgent: { 
+    bg: 'bg-rose-100 dark:bg-rose-900/30', 
+    text: 'text-rose-700 dark:text-rose-400',
+    dot: 'bg-rose-500',
+    label: 'Срочно'
+  },
+};
 
 interface KanbanCardProps {
   task: {
@@ -32,23 +68,12 @@ interface KanbanCardProps {
     };
   };
   isDragging?: boolean;
+  onView?: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
-const priorityColors: Record<string, string> = {
-  urgent: 'bg-red-500/10 text-red-600 border-red-500/20',
-  high: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
-  medium: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
-  low: 'bg-green-500/10 text-green-600 border-green-500/20',
-};
-
-const priorityLabels: Record<string, string> = {
-  urgent: 'Срочно',
-  high: 'Высокий',
-  medium: 'Средний',
-  low: 'Низкий',
-};
-
-export function KanbanCard({ task, isDragging }: KanbanCardProps) {
+export function KanbanCard({ task, isDragging, onView, onEdit, onDelete }: KanbanCardProps) {
   const {
     attributes,
     listeners,
@@ -65,62 +90,148 @@ export function KanbanCard({ task, isDragging }: KanbanCardProps) {
 
   const completedSubtasks = task.subtasks?.filter((s) => s.status === 'done').length || 0;
   const totalSubtasks = task.subtasks?.length || 0;
+  const subtaskProgress = totalSubtasks > 0 ? (completedSubtasks / totalSubtasks) * 100 : 0;
+  const priority = priorityConfig[task.priority] || priorityConfig.medium;
+
+  const dueDate = task.dueDate ? new Date(task.dueDate) : null;
+  const isOverdue = dueDate && isPast(dueDate) && task.status !== 'done';
+  const isDueToday = dueDate && isToday(dueDate);
+
+  const handleCardClick = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).closest('button')) {
+      e.stopPropagation();
+      return;
+    }
+    onView?.();
+  };
 
   return (
     <Card
       ref={setNodeRef}
       style={style}
-      {...attributes}
-      {...listeners}
       className={cn(
-        'cursor-grab active:cursor-grabbing transition-all hover:shadow-md',
-        (isDragging || isSortableDragging) && 'opacity-50 shadow-lg rotate-2'
+        'group relative bg-card/80 backdrop-blur-sm border-border/50 rounded-xl transition-all duration-200',
+        'hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30 hover:-translate-y-0.5',
+        'cursor-pointer active:cursor-grabbing',
+        (isDragging || isSortableDragging) && 'opacity-60 shadow-2xl shadow-primary/20 scale-[1.02] rotate-2 z-50'
       )}
+      onClick={handleCardClick}
     >
-      <CardContent className="p-3">
-        {/* Priority badge */}
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <Badge
-            variant="outline"
-            className={cn('text-xs', priorityColors[task.priority])}
+      {/* Priority indicator line */}
+      <div 
+        className={cn(
+          'absolute top-0 left-0 right-0 h-1 rounded-t-xl',
+          priority.bg
+        )}
+      />
+
+      {/* Drag handle area */}
+      <div 
+        {...attributes} 
+        {...listeners}
+        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
+      >
+        <GripVertical className="h-4 w-4 text-muted-foreground" />
+      </div>
+
+      <div className="p-4 pt-5">
+        {/* Header: Priority & Menu */}
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <Badge 
+            variant="secondary"
+            className={cn(
+              'font-medium text-[11px] px-2 py-0.5 rounded-full border-0',
+              priority.bg,
+              priority.text
+            )}
           >
-            {priorityLabels[task.priority] || task.priority}
+            <span className={cn('w-1.5 h-1.5 rounded-full mr-1.5', priority.dot)} />
+            {priority.label}
           </Badge>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-muted"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-40">
+              <DropdownMenuItem 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit?.();
+                }}
+              >
+                Редактировать
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete?.();
+                }}
+                className="text-destructive focus:text-destructive"
+              >
+                Удалить
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
 
         {/* Title */}
-        <h4 className="font-medium text-sm line-clamp-2 mb-2">{task.title}</h4>
+        <h4 className="font-semibold text-sm line-clamp-2 mb-2 leading-snug group-hover:text-primary transition-colors">
+          {task.title}
+        </h4>
 
-        {/* Description preview */}
+        {/* Description */}
         {task.description && (
-          <p className="text-xs text-muted-foreground line-clamp-2 mb-3">
+          <p className="text-xs text-muted-foreground line-clamp-2 mb-3 leading-relaxed">
             {task.description}
           </p>
         )}
 
         {/* Subtasks progress */}
         {totalSubtasks > 0 && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground mb-3">
-            <CheckCircle2 className="h-3 w-3" />
-            <span>{completedSubtasks}/{totalSubtasks} подзадач</span>
+          <div className="mb-3 space-y-1.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="text-muted-foreground flex items-center gap-1.5">
+                <CheckCircle2 className="h-3.5 w-3.5" />
+                Подзадачи
+              </span>
+              <span className="font-medium">{completedSubtasks}/{totalSubtasks}</span>
+            </div>
+            <Progress value={subtaskProgress} className="h-1.5" />
           </div>
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-2 border-t">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between pt-3 border-t border-border/50">
+          <div className="flex items-center gap-3">
             {/* Due date */}
-            {task.dueDate && (
-              <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <Calendar className="h-3 w-3" />
-                <span>{format(new Date(task.dueDate), 'd MMM', { locale: ru })}</span>
+            {dueDate && (
+              <div className={cn(
+                'flex items-center gap-1.5 text-xs font-medium',
+                isOverdue ? 'text-rose-500' : 
+                isDueToday ? 'text-amber-500' : 
+                'text-muted-foreground'
+              )}>
+                {isOverdue ? (
+                  <Clock className="h-3.5 w-3.5" />
+                ) : (
+                  <Calendar className="h-3.5 w-3.5" />
+                )}
+                <span>{format(dueDate, 'd MMM', { locale: ru })}</span>
               </div>
             )}
 
             {/* Comments count */}
             {(task._count?.comments || 0) > 0 && (
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                <MessageSquare className="h-3 w-3" />
+                <MessageSquare className="h-3.5 w-3.5" />
                 <span>{task._count?.comments}</span>
               </div>
             )}
@@ -128,15 +239,15 @@ export function KanbanCard({ task, isDragging }: KanbanCardProps) {
 
           {/* Assignee */}
           {task.assignee && (
-            <Avatar className="h-6 w-6">
+            <Avatar className="h-7 w-7 ring-2 ring-background shadow-sm">
               <AvatarImage src={task.assignee.image || undefined} />
-              <AvatarFallback className="text-xs">
+              <AvatarFallback className="text-[10px] font-medium bg-gradient-to-br from-primary/80 to-primary text-primary-foreground">
                 {task.assignee.name?.[0]?.toUpperCase() || task.assignee.email[0].toUpperCase()}
               </AvatarFallback>
             </Avatar>
           )}
         </div>
-      </CardContent>
+      </div>
     </Card>
   );
 }

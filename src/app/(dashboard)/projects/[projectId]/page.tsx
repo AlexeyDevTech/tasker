@@ -10,6 +10,7 @@ import { KanbanBoard } from '@/components/board/kanban-board';
 import { TimelineView } from '@/components/timeline/timeline-view';
 import { TaskListView } from '@/components/tasks/task-list-view';
 import { CalendarView } from '@/components/calendar/calendar-view';
+import { QuickTaskCreate } from '@/components/tasks/quick-task-create';
 import { useProjectStore } from '@/stores/project-store';
 import { useUIStore } from '@/stores/ui-store';
 import { Button } from '@/components/ui/button';
@@ -73,6 +74,14 @@ async function createTask(data: any) {
   return res.json();
 }
 
+// Delete task
+async function deleteTask(id: string) {
+  const res = await fetch(`/api/tasks?id=${id}`, {
+    method: 'DELETE',
+  });
+  return res.json();
+}
+
 export default function ProjectPage() {
   const params = useParams();
   const router = useRouter();
@@ -80,7 +89,7 @@ export default function ProjectPage() {
   const projectId = params.projectId as string;
   
   const { sidebarOpen, viewSettings, setViewMode } = useProjectStore();
-  const { commandPaletteOpen, setCommandPaletteOpen } = useUIStore();
+  const { commandPaletteOpen, setCommandPaletteOpen, createTaskModalOpen, setCreateTaskModalOpen } = useUIStore();
 
   // Queries
   const { data: project, isLoading: projectLoading } = useQuery({
@@ -118,6 +127,17 @@ export default function ProjectPage() {
     },
   });
 
+  const deleteTaskMutation = useMutation({
+    mutationFn: deleteTask,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      toast.success('Задача удалена');
+    },
+    onError: () => {
+      toast.error('Ошибка при удалении задачи');
+    },
+  });
+
   // Handle task status change
   const handleTaskStatusChange = (taskId: string, newStatus: string) => {
     updateTaskMutation.mutate({ id: taskId, status: newStatus });
@@ -129,6 +149,19 @@ export default function ProjectPage() {
       ...taskData,
       projectId,
     });
+  };
+
+  // Handle edit task
+  const handleEditTask = (taskId: string) => {
+    // TODO: Open edit modal or navigate to task
+    toast.info('Редактирование задачи в разработке');
+  };
+
+  // Handle delete task
+  const handleDeleteTask = (taskId: string) => {
+    if (confirm('Удалить задачу?')) {
+      deleteTaskMutation.mutate(taskId);
+    }
   };
 
   // Calculate progress
@@ -267,6 +300,8 @@ export default function ProjectPage() {
                 tasks={tasks} 
                 onStatusChange={handleTaskStatusChange}
                 onCreateTask={handleCreateTask}
+                onEditTask={handleEditTask}
+                onDeleteTask={handleDeleteTask}
                 isLoading={isLoading}
               />
             )}
@@ -285,6 +320,13 @@ export default function ProjectPage() {
 
       {/* Command Palette */}
       <CommandPalette projects={allProjects} />
+      
+      {/* Quick Task Create */}
+      <QuickTaskCreate 
+        onTaskCreate={handleCreateTask}
+        projects={allProjects}
+        defaultProjectId={projectId}
+      />
     </div>
   );
 }

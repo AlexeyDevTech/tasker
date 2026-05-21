@@ -1,26 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import {
+  getUserId,
+  unauthorized,
+  forbidden,
+  canAccessProject,
+  canAccessTask,
+  parseBody,
+} from '@/lib/api-auth';
+import { createTaskSchema, updateTaskSchema } from '@/lib/validations';
 
-// GET /api/tasks - Get tasks
+// GET /api/tasks - Get tasks the current user can access
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    let userId = session?.user?.id;
-
-    if (!userId) {
-      let user = await db.user.findFirst();
-      if (!user) {
-        user = await db.user.create({
-          data: {
-            email: 'demo@taskflow.app',
-            name: 'Demo User',
-          },
-        });
-      }
-      userId = user.id;
-    }
+    const userId = await getUserId();
+    if (!userId) return unauthorized();
 
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get('projectId');
@@ -28,9 +22,21 @@ export async function GET(request: NextRequest) {
     const priority = searchParams.get('priority');
     const assigneeId = searchParams.get('assigneeId');
 
+    // Scope tasks to projects the user owns or is a member of.
+    if (projectId) {
+      if (!(await canAccessProject(projectId, userId))) return forbidden();
+    }
+
+    const accessibleProject = {
+      OR: [
+        { ownerId: userId },
+        { members: { some: { userId } } },
+      ],
+    };
+
     const tasks = await db.task.findMany({
       where: {
-        ...(projectId ? { projectId } : {}),
+        ...(projectId ? { projectId } : { project: accessibleProject }),
         ...(status ? { status } : {}),
         ...(priority ? { priority } : {}),
         ...(assigneeId ? { assigneeId } : {}),
@@ -74,23 +80,11 @@ export async function GET(request: NextRequest) {
 // POST /api/tasks - Create task
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    let userId = session?.user?.id;
+    const userId = await getUserId();
+    if (!userId) return unauthorized();
 
-    if (!userId) {
-      let user = await db.user.findFirst();
-      if (!user) {
-        user = await db.user.create({
-          data: {
-            email: 'demo@taskflow.app',
-            name: 'Demo User',
-          },
-        });
-      }
-      userId = user.id;
-    }
-
-    const body = await request.json();
+    const parsed = await parseBody(request, createTaskSchema);
+    if (parsed.response) return parsed.response;
     const {
       title,
       description,
@@ -102,7 +96,9 @@ export async function POST(request: NextRequest) {
       startDate,
       dueDate,
       estimatedHours,
-    } = body;
+    } = parsed.data;
+
+    if (!(await canAccessProject(projectId, userId))) return forbidden();
 
     // Get max position in project
     const maxPosition = await db.task.aggregate({
@@ -119,8 +115,8 @@ export async function POST(request: NextRequest) {
         assigneeId: assigneeId || null,
         status: status || 'todo',
         priority: priority || 'medium',
-        startDate: startDate ? new Date(startDate) : null,
-        dueDate: dueDate ? new Date(dueDate) : null,
+        startDate,
+        dueDate,
         estimatedHours,
         position: (maxPosition._max.position || 0) + 1,
       },
@@ -154,17 +150,18 @@ export async function POST(request: NextRequest) {
 // PATCH /api/tasks - Update task
 export async function PATCH(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { id, ...updates } = body;
+    const userId = await getUserId();
+    if (!userId) return unauthorized();
+
+    const parsed = await parseBody(request, updateTaskSchema);
+    if (parsed.response) return parsed.response;
+    const { id, ...data } = parsed.data;
+
+    if (!(await canAccessTask(id, userId))) return forbidden();
 
     const task = await db.task.update({
       where: { id },
-      data: {
-        ...updates,
-        ...(updates.startDate && { startDate: new Date(updates.startDate) }),
-        ...(updates.dueDate && { dueDate: new Date(updates.dueDate) }),
-        ...(updates.completedAt && { completedAt: new Date(updates.completedAt) }),
-      },
+      data,
       include: {
         assignee: {
           select: { id: true, name: true, email: true, image: true },
@@ -185,6 +182,9 @@ export async function PATCH(request: NextRequest) {
 // DELETE /api/tasks - Delete task
 export async function DELETE(request: NextRequest) {
   try {
+    const userId = await getUserId();
+    if (!userId) return unauthorized();
+
     const { searchParams } = new URL(request.url);
     const id = searchParams.get('id');
 
@@ -194,6 +194,7 @@ export async function DELETE(request: NextRequest) {
         { status: 400 }
       );
     }
+    if (!(await canAccessTask(id, userId))) return forbidden();
 
     await db.task.delete({
       where: { id },

@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { PageHeader } from '@/components/common/page-header';
+import { InboxFilters } from '@/components/inbox/inbox-filters';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { CommandPalette } from '@/components/layout/command-palette';
@@ -156,63 +158,23 @@ function InboxContent() {
       
       <div className={cn(
         'transition-all duration-300',
-        sidebarOpen ? 'ml-64' : 'ml-0'
+        sidebarOpen ? 'ml-60' : 'ml-0'
       )}>
         <Header user={user} />
-        
+
         <main className="p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-                <InboxIcon className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">Входящие</h1>
-                <p className="text-muted-foreground text-sm">
-                  {filteredTasks.length} задач требуют внимания
-                </p>
-              </div>
-            </div>
-          </div>
+          <PageHeader
+            icon={<InboxIcon className="h-4 w-4" />}
+            title="Входящие"
+            description={`${filteredTasks.length} задач требуют внимания`}
+          />
 
-          {/* Filters */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Поиск задач..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-
-            <div className="flex items-center gap-2">
-              <Button
-                variant={filter === 'all' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setFilter('all')}
-              >
-                Все
-              </Button>
-              <Button
-                variant={filter === 'today' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setFilter('today')}
-              >
-                Сегодня
-              </Button>
-              <Button
-                variant={filter === 'overdue' ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setFilter('overdue')}
-                className="text-destructive"
-              >
-                Просрочено
-              </Button>
-            </div>
-          </div>
+          <InboxFilters
+            search={search}
+            setSearch={setSearch}
+            filter={filter}
+            setFilter={setFilter}
+          />
 
           {/* Tasks */}
           {isLoading ? (

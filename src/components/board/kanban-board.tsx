@@ -154,7 +154,7 @@ export function KanbanBoard({ tasks, onStatusChange, onCreateTask, onEditTask, o
         onDragOver={handleDragOver}
         onDragEnd={handleDragEnd}
       >
-        <div className="flex gap-5 overflow-x-auto pb-6 h-full">
+        <div className="flex gap-3 overflow-x-auto pb-6 h-full">
           {columns.map((column) => (
             <KanbanColumn
               key={column.id}
@@ -194,7 +194,7 @@ export function KanbanBoard({ tasks, onStatusChange, onCreateTask, onEditTask, o
 
         <DragOverlay>
           {activeTask ? (
-            <div className="rotate-3">
+            <div className="rotate-1">
               <KanbanCard task={activeTask} isDragging />
             </div>
           ) : null}
@@ -203,14 +203,9 @@ export function KanbanBoard({ tasks, onStatusChange, onCreateTask, onEditTask, o
 
       {/* Create Task Dialog */}
       <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-        <DialogContent className="sm:max-w-lg border-border/50 bg-card/95 backdrop-blur-xl">
+        <DialogContent className="sm:max-w-lg">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-xl">
-              <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Sparkles className="h-4 w-4 text-primary" />
-              </div>
-              Новая задача
-            </DialogTitle>
+            <DialogTitle className="text-lg">Новая задача</DialogTitle>
           </DialogHeader>
 
           <div className="space-y-5 py-4">
@@ -221,7 +216,7 @@ export function KanbanBoard({ tasks, onStatusChange, onCreateTask, onEditTask, o
                 value={newTaskTitle}
                 onChange={(e) => setNewTaskTitle(e.target.value)}
                 placeholder="Введите название задачи..."
-                className="h-11 border-border/60 focus:border-primary/50"
+                className="h-9 border-border focus:border-primary/50"
               />
             </div>
 
@@ -233,7 +228,7 @@ export function KanbanBoard({ tasks, onStatusChange, onCreateTask, onEditTask, o
                 onChange={(e) => setNewTaskDescription(e.target.value)}
                 placeholder="Добавьте описание задачи..."
                 rows={3}
-                className="border-border/60 focus:border-primary/50 resize-none"
+                className=" focus:border-primary/50 resize-none"
               />
             </div>
 
@@ -241,7 +236,7 @@ export function KanbanBoard({ tasks, onStatusChange, onCreateTask, onEditTask, o
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Приоритет</Label>
                 <Select value={newTaskPriority} onValueChange={(v) => setNewTaskPriority(v as TaskPriority)}>
-                  <SelectTrigger className="h-11 border-border/60">
+                  <SelectTrigger className="h-9 border-border">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -276,7 +271,7 @@ export function KanbanBoard({ tasks, onStatusChange, onCreateTask, onEditTask, o
               <div className="space-y-2">
                 <Label className="text-sm font-medium">Статус</Label>
                 <Select value={newTaskStatus} onValueChange={(v) => setNewTaskStatus(v as TaskStatus)}>
-                  <SelectTrigger className="h-11 border-border/60">
+                  <SelectTrigger className="h-9 border-border">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -291,13 +286,13 @@ export function KanbanBoard({ tasks, onStatusChange, onCreateTask, onEditTask, o
           </div>
 
           <DialogFooter className="gap-2">
-            <Button variant="outline" onClick={() => setCreateDialogOpen(false)} className="border-border/60">
+            <Button variant="outline" onClick={() => setCreateDialogOpen(false)} className="">
               Отмена
             </Button>
             <Button 
               onClick={handleCreateTask} 
               disabled={!newTaskTitle.trim()}
-              className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25 gap-2"
+              className="bg-primary hover:bg-primary/90 gap-2"
             >
               <Plus className="h-4 w-4" />
               Создать задачу

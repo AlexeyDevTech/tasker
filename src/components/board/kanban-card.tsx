@@ -110,31 +110,23 @@ export function KanbanCard({ task, isDragging, onView, onEdit, onDelete }: Kanba
       ref={setNodeRef}
       style={style}
       className={cn(
-        'group relative bg-card/80 backdrop-blur-sm border-border/50 rounded-xl transition-all duration-200',
-        'hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30 hover:-translate-y-0.5',
+        'group relative bg-card border-border rounded-lg transition-colors',
+        'hover:border-foreground/15 hover:shadow-sm',
         'cursor-pointer active:cursor-grabbing',
-        (isDragging || isSortableDragging) && 'opacity-60 shadow-2xl shadow-primary/20 scale-[1.02] rotate-2 z-50'
+        (isDragging || isSortableDragging) && 'opacity-70 shadow-md z-50'
       )}
       onClick={handleCardClick}
     >
-      {/* Priority indicator line */}
-      <div 
-        className={cn(
-          'absolute top-0 left-0 right-0 h-1 rounded-t-xl',
-          priority.bg
-        )}
-      />
-
       {/* Drag handle area */}
-      <div 
-        {...attributes} 
+      <div
+        {...attributes}
         {...listeners}
         className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab active:cursor-grabbing"
       >
         <GripVertical className="h-4 w-4 text-muted-foreground" />
       </div>
 
-      <div className="p-4 pt-5">
+      <div className="p-3">
         {/* Header: Priority & Menu */}
         <div className="flex items-start justify-between gap-2 mb-3">
           <Badge 
@@ -183,7 +175,7 @@ export function KanbanCard({ task, isDragging, onView, onEdit, onDelete }: Kanba
         </div>
 
         {/* Title */}
-        <h4 className="font-semibold text-sm line-clamp-2 mb-2 leading-snug group-hover:text-primary transition-colors">
+        <h4 className="font-medium text-sm line-clamp-2 mb-2 leading-snug group-hover:text-primary transition-colors">
           {task.title}
         </h4>
 
@@ -209,7 +201,7 @@ export function KanbanCard({ task, isDragging, onView, onEdit, onDelete }: Kanba
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between pt-3 border-t border-border/50">
+        <div className="flex items-center justify-between pt-3 border-t border-border">
           <div className="flex items-center gap-3">
             {/* Due date */}
             {dueDate && (
@@ -239,10 +231,10 @@ export function KanbanCard({ task, isDragging, onView, onEdit, onDelete }: Kanba
 
           {/* Assignee */}
           {task.assignee && (
-            <Avatar className="h-7 w-7 ring-2 ring-background shadow-sm">
+            <Avatar className="h-6 w-6">
               <AvatarImage src={task.assignee.image || undefined} />
-              <AvatarFallback className="text-[10px] font-medium bg-gradient-to-br from-primary/80 to-primary text-primary-foreground">
-                {task.assignee.name?.[0]?.toUpperCase() || task.assignee.email[0].toUpperCase()}
+              <AvatarFallback className="text-[10px] font-medium bg-primary/10 text-primary">
+                {task.assignee.name?.[0]?.toUpperCase() || task.assignee.email?.[0]?.toUpperCase() || 'U'}
               </AvatarFallback>
             </Avatar>
           )}

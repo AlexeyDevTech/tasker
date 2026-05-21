@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react';
 import { useQuery, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
+import { PageHeader } from '@/components/common/page-header';
+import { AvatarUpload } from '@/components/settings/avatar-upload';
+import { ProfileForm } from '@/components/settings/profile-form';
 import { CommandPalette } from '@/components/layout/command-palette';
 import { useProjectStore } from '@/stores/project-store';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -56,6 +59,14 @@ async function fetchProjects() {
   return data.data || [];
 }
 
+// Fetch the current user's profile (timezone / work time live in the DB,
+// not in the next-auth session).
+async function fetchProfile() {
+  const res = await fetch('/api/user/settings');
+  if (!res.ok) throw new Error('Failed to fetch profile');
+  return res.json();
+}
+
 function SettingsContent() {
   const { sidebarOpen } = useProjectStore();
   const { theme, setTheme } = useTheme();
@@ -69,18 +80,24 @@ function SettingsContent() {
   const { data: session, update: updateSession } = useSession();
   const user = session?.user;
 
+  const { data: profile } = useQuery({
+    queryKey: ['profile'],
+    queryFn: fetchProfile,
+    enabled: !!user,
+  });
+
   // Form state
-  const [name, setName] = useState(user?.name || '');
-  const [timezone, setTimezone] = useState(user?.timezone || 'utc');
-  const [workTime, setWorkTime] = useState(user?.preferredWorkTime || 'morning');
+  const [name, setName] = useState('');
+  const [timezone, setTimezone] = useState('utc');
+  const [workTime, setWorkTime] = useState('morning');
 
   useEffect(() => {
-    if (user) {
-      setName(user.name || '');
-      setTimezone(user.timezone || 'utc');
-      setWorkTime(user.preferredWorkTime || 'morning');
+    if (profile) {
+      setName(profile.name || '');
+      setTimezone(profile.timezone || 'utc');
+      setWorkTime(profile.preferredWorkTime || 'morning');
     }
-  }, [user]);
+  }, [profile]);
 
   const handleSave = async () => {
     setSaving(true);
@@ -130,25 +147,16 @@ function SettingsContent() {
       
       <div className={cn(
         'transition-all duration-300',
-        sidebarOpen ? 'ml-64' : 'ml-0'
+        sidebarOpen ? 'ml-60' : 'ml-0'
       )}>
         <Header user={user} />
         
         <main className="p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-slate-500 to-gray-600 flex items-center justify-center">
-                <SettingsIcon className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">Настройки</h1>
-                <p className="text-muted-foreground text-sm">
-                  Управление аккаунтом и предпочтениями
-                </p>
-              </div>
-            </div>
-          </div>
+          <PageHeader
+            icon={<SettingsIcon className="h-4 w-4" />}
+            title="Настройки"
+            description="Управление аккаунтом и предпочтениями"
+          />
 
           <Tabs defaultValue="profile" className="space-y-6">
             <TabsList>
@@ -181,69 +189,23 @@ function SettingsContent() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    {/* Avatar */}
-                    <div className="flex items-center gap-6">
-                      <Avatar className="h-20 w-20">
-                        <AvatarImage src={user.image || undefined} />
-                        <AvatarFallback className="text-2xl">
-                          {user.name?.[0]?.toUpperCase() || 'D'}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="space-y-2">
-                        <Button variant="outline">Изменить аватар</Button>
-                        <p className="text-xs text-muted-foreground">
-                          JPG, PNG или GIF. Максимум 2MB.
-                        </p>
-                      </div>
-                    </div>
+                    <AvatarUpload
+                      userImage={user.image || undefined}
+                      userName={user.name || ''}
+                      onAvatarChange={() => toast.info('Изменение аватара в разработке')}
+                    />
 
                     <Separator />
 
-                    {/* Form */}
-                    <div className="grid gap-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <Label htmlFor="name">Имя</Label>
-                          <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
-                        </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="email">Email</Label>
-                          <Input id="email" type="email" value={user.email || ''} disabled />
-                          <Badge variant="secondary" className="text-xs">
-                            Основной email
-                          </Badge>
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="timezone">Часовой пояс</Label>
-                        <Select value={timezone} onValueChange={setTimezone}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="utc">UTC (Москва: UTC+3)</SelectItem>
-                            <SelectItem value="eet">EET (Киев: UTC+2)</SelectItem>
-                            <SelectItem value="pst">PST (Лос-Анджелес: UTC-8)</SelectItem>
-                            <SelectItem value="est">EST (Нью-Йорк: UTC-5)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="worktime">Предпочитаемое время работы</Label>
-                        <Select value={workTime} onValueChange={setWorkTime}>
-                          <SelectTrigger>
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="morning">🌅 Утро (6:00 - 12:00)</SelectItem>
-                            <SelectItem value="afternoon">☀️ День (12:00 - 18:00)</SelectItem>
-                            <SelectItem value="evening">🌙 Вечер (18:00 - 00:00)</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
+                    <ProfileForm
+                      name={name}
+                      setName={setName}
+                      email={user.email || ''}
+                      timezone={timezone}
+                      setTimezone={setTimezone}
+                      workTime={workTime}
+                      setWorkTime={setWorkTime}
+                    />
                   </CardContent>
                 </Card>
               </div>

@@ -2,6 +2,8 @@
 
 import { useState, useMemo } from 'react';
 import { useQuery, QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { CalendarPageHeader } from '@/components/calendar/calendar-page-header';
+import { CalendarQuickStats } from '@/components/calendar/calendar-quick-stats';
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { CommandPalette } from '@/components/layout/command-palette';
@@ -159,70 +161,21 @@ function CalendarContent() {
       
       <div className={cn(
         'transition-all duration-300',
-        sidebarOpen ? 'ml-64' : 'ml-0'
+        sidebarOpen ? 'ml-60' : 'ml-0'
       )}>
         <Header user={user} />
         
         <main className="p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex items-center gap-3">
-              <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center">
-                <CalendarIcon className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold">Календарь</h1>
-                <p className="text-muted-foreground text-sm">
-                  Обзор всех задач по датам
-                </p>
-              </div>
-            </div>
-          </div>
+          <CalendarPageHeader
+            title="Календарь"
+            description="Обзор всех задач по датам"
+          />
 
-          {/* Quick stats */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-            <Card className="border-l-4 border-l-blue-500">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                    <CalendarIcon className="h-5 w-5 text-blue-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Сегодня</p>
-                    <p className="text-2xl font-bold">{todayTasks.length} задач</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-red-500">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-red-500/10 flex items-center justify-center">
-                    <Clock className="h-5 w-5 text-red-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Просрочено</p>
-                    <p className="text-2xl font-bold">{overdueTasks.length} задач</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card className="border-l-4 border-l-green-500">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-                    <CheckCircle2 className="h-5 w-5 text-green-500" />
-                  </div>
-                  <div>
-                    <p className="text-sm text-muted-foreground">Всего задач</p>
-                    <p className="text-2xl font-bold">{tasks.length}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <CalendarQuickStats
+            todayTasksCount={todayTasks.length}
+            overdueTasksCount={overdueTasks.length}
+            totalTasksCount={tasks.length}
+          />
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Calendar */}

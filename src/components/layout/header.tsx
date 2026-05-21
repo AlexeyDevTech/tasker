@@ -40,11 +40,12 @@ import { cn } from '@/lib/utils';
 import type { ViewMode } from '@/types';
 
 interface HeaderProps {
+  // Matches the next-auth session user shape (fields may be absent/null).
   user?: {
     id: string;
-    name: string | null;
-    email: string;
-    image: string | null;
+    name?: string | null;
+    email?: string | null;
+    image?: string | null;
   } | null;
   projectId?: string;
 }
@@ -77,13 +78,13 @@ export function Header({ user, projectId }: HeaderProps) {
   };
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center justify-between border-b border-border/50 bg-background/80 backdrop-blur-xl px-4 lg:px-6">
+    <header className="sticky top-0 z-30 flex h-14 items-center justify-between border-b border-border bg-background px-4 lg:px-6">
       {/* Left section */}
       <div className="flex items-center gap-3">
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 md:hidden hover:bg-primary/10"
+          className="h-8 w-8 md:hidden hover:bg-accent"
           onClick={toggleSidebar}
         >
           <Menu className="h-5 w-5" />
@@ -91,7 +92,7 @@ export function Header({ user, projectId }: HeaderProps) {
 
         {projectId && (
           <div className="flex items-center gap-2">
-            <div className="flex items-center rounded-xl border border-border/60 bg-muted/30 p-1">
+            <div className="flex items-center rounded-md bg-muted p-0.5">
               {viewModes.map((mode) => {
                 const Icon = mode.icon;
                 return (
@@ -99,10 +100,10 @@ export function Header({ user, projectId }: HeaderProps) {
                     key={mode.value}
                     onClick={() => setViewMode(mode.value)}
                     className={cn(
-                      'flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all duration-200',
+                      'flex items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-sm font-medium transition-colors',
                       viewSettings.viewMode === mode.value
                         ? 'bg-background text-foreground shadow-sm'
-                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+                        : 'text-muted-foreground hover:text-foreground'
                     )}
                   >
                     <Icon className="h-4 w-4" />
@@ -122,7 +123,7 @@ export function Header({ user, projectId }: HeaderProps) {
           <DropdownMenuTrigger asChild>
             <Button
               size="sm"
-              className="hidden sm:flex gap-2 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20 transition-all duration-200 hover:shadow-xl hover:shadow-primary/25 hover:-translate-y-0.5"
+              className="hidden sm:flex h-8 gap-1.5 bg-primary hover:bg-primary/90"
             >
               <Plus className="h-4 w-4" />
               <span>Создать</span>
@@ -165,7 +166,7 @@ export function Header({ user, projectId }: HeaderProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 sm:hidden hover:bg-primary/10"
+          className="h-8 w-8 sm:hidden hover:bg-accent"
           onClick={() => setCreateTaskModalOpen(true)}
         >
           <Plus className="h-4.5 w-4.5" />
@@ -175,7 +176,7 @@ export function Header({ user, projectId }: HeaderProps) {
         <Button
           variant="ghost"
           size="icon"
-          className="h-9 w-9 hover:bg-primary/10 hover:text-primary transition-colors"
+          className="h-8 w-8 hover:bg-accent transition-colors"
           onClick={() => setCommandPaletteOpen(true)}
         >
           <Search className="h-4.5 w-4.5" />
@@ -187,36 +188,19 @@ export function Header({ user, projectId }: HeaderProps) {
             <Button
               variant="ghost"
               size="icon"
-              className="h-9 w-9 relative hover:bg-primary/10 transition-colors"
+              className="h-8 w-8 relative hover:bg-accent transition-colors"
             >
               <Bell className="h-4.5 w-4.5" />
-              <span className="absolute right-1 top-1 flex h-4 w-4 items-center justify-center rounded-full bg-gradient-to-br from-rose-500 to-pink-600 text-[9px] font-bold text-white shadow-lg shadow-rose-500/30">
-                3
-              </span>
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-80">
             <DropdownMenuLabel className="font-normal">
-              <div className="flex flex-col space-y-1">
-                <p className="text-sm font-medium leading-none">Уведомления</p>
-                <p className="text-xs text-muted-foreground">
-                  У вас 3 непрочитанных уведомления
-                </p>
-              </div>
+              <p className="text-sm font-medium leading-none">Уведомления</p>
             </DropdownMenuLabel>
             <DropdownMenuSeparator />
-            <div className="max-h-64 overflow-y-auto">
-              {[1, 2, 3].map((i) => (
-                <DropdownMenuItem key={i} className="flex items-start gap-3 p-3 cursor-pointer">
-                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0">
-                    <Sparkles className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="flex-1 space-y-1">
-                    <p className="text-sm font-medium leading-tight">Новое уведомление</p>
-                    <p className="text-xs text-muted-foreground">Описание уведомления...</p>
-                  </div>
-                </DropdownMenuItem>
-              ))}
+            <div className="py-8 text-center">
+              <Bell className="mx-auto mb-2 h-6 w-6 text-muted-foreground/40" />
+              <p className="text-sm text-muted-foreground">Нет новых уведомлений</p>
             </div>
           </DropdownMenuContent>
         </DropdownMenu>
@@ -224,7 +208,7 @@ export function Header({ user, projectId }: HeaderProps) {
         {/* Theme Toggle */}
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="h-9 w-9 hover:bg-primary/10 transition-colors">
+            <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-accent transition-colors">
               <Sun className="h-4.5 w-4.5 rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
               <Moon className="absolute h-4.5 w-4.5 rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
               <span className="sr-only">Переключить тему</span>
@@ -250,15 +234,15 @@ export function Header({ user, projectId }: HeaderProps) {
         {user ? (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="h-9 gap-2 px-2 hover:bg-primary/10 transition-colors">
-                <Avatar className="h-7 w-7 ring-2 ring-primary/20">
+              <Button variant="ghost" className="h-8 gap-2 px-1.5 hover:bg-accent transition-colors">
+                <Avatar className="h-6 w-6">
                   <AvatarImage src={user.image || undefined} alt={user.name || ''} />
-                  <AvatarFallback className="text-xs bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-medium">
-                    {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
+                  <AvatarFallback className="text-[11px] bg-primary/10 text-primary font-medium">
+                    {user.name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'U'}
                   </AvatarFallback>
                 </Avatar>
                 <span className="hidden md:inline text-sm font-medium">
-                  {user.name || user.email.split('@')[0]}
+                  {user.name || user.email?.split('@')[0] || 'Пользователь'}
                 </span>
                 <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
               </Button>
@@ -267,10 +251,10 @@ export function Header({ user, projectId }: HeaderProps) {
               <DropdownMenuLabel className="font-normal">
                 <div className="flex flex-col space-y-2 p-1">
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10 ring-2 ring-primary/20">
+                    <Avatar className="h-10 w-10">
                       <AvatarImage src={user.image || undefined} alt={user.name || ''} />
-                      <AvatarFallback className="bg-gradient-to-br from-primary to-primary/80 text-primary-foreground font-medium">
-                        {user.name?.[0]?.toUpperCase() || user.email[0].toUpperCase()}
+                      <AvatarFallback className="bg-primary/10 text-primary font-medium">
+                        {user.name?.[0]?.toUpperCase() || user.email?.[0]?.toUpperCase() || 'U'}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
@@ -304,7 +288,7 @@ export function Header({ user, projectId }: HeaderProps) {
             </DropdownMenuContent>
           </DropdownMenu>
         ) : (
-          <Button asChild size="sm" className="bg-primary hover:bg-primary/90 shadow-lg shadow-primary/20">
+          <Button asChild size="sm" className="h-8 bg-primary hover:bg-primary/90">
             <Link href="/login">Войти</Link>
           </Button>
         )}

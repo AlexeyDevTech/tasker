@@ -1,29 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { getServerSession } from 'next-auth';
-import { authOptions } from '@/lib/auth';
+import { getUserId, unauthorized, badRequest, parseBody } from '@/lib/api-auth';
+import { createProjectSchema } from '@/lib/validations';
 
 // GET /api/projects - Get all projects for current user
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    
-    // For demo, create a default user if not authenticated
-    let userId = session?.user?.id;
-    
-    if (!userId) {
-      // Find or create demo user
-      let user = await db.user.findFirst();
-      if (!user) {
-        user = await db.user.create({
-          data: {
-            email: 'demo@taskflow.app',
-            name: 'Demo User',
-          },
-        });
-      }
-      userId = user.id;
-    }
+    const userId = await getUserId();
+    if (!userId) return unauthorized();
 
     const { searchParams } = new URL(request.url);
     const parentId = searchParams.get('parentId');
@@ -73,33 +57,22 @@ export async function GET(request: NextRequest) {
 // POST /api/projects - Create new project
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions);
-    let userId = session?.user?.id;
+    const userId = await getUserId();
+    if (!userId) return unauthorized();
 
-    if (!userId) {
-      let user = await db.user.findFirst();
-      if (!user) {
-        user = await db.user.create({
-          data: {
-            email: 'demo@taskflow.app',
-            name: 'Demo User',
-          },
-        });
-      }
-      userId = user.id;
+    const parsed = await parseBody(request, createProjectSchema);
+    if (parsed.response) return parsed.response;
+    const { name, description, color, icon, parentId, templateId, startDate, endDate } =
+      parsed.data;
+
+    // If a parent project is specified, the user must have access to it.
+    if (parentId) {
+      const parent = await db.project.findFirst({
+        where: { id: parentId, ownerId: userId },
+        select: { id: true },
+      });
+      if (!parent) return badRequest('Invalid parent project');
     }
-
-    const body = await request.json();
-    const { 
-      name, 
-      description, 
-      color, 
-      icon, 
-      parentId,
-      templateId,
-      startDate,
-      endDate,
-    } = body;
 
     // Create project
     const project = await db.project.create({
@@ -111,8 +84,8 @@ export async function POST(request: NextRequest) {
         parentId: parentId || null,
         ownerId: userId,
         templateId: templateId || null,
-        startDate: startDate ? new Date(startDate) : null,
-        endDate: endDate ? new Date(endDate) : null,
+        startDate,
+        endDate,
       },
       include: {
         owner: {

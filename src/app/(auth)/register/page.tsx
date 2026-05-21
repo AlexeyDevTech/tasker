@@ -52,7 +52,6 @@ export default function RegisterPage() {
     setIsLoading(true);
 
     try {
-      // Here you would call your registration API
       const response = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -63,13 +62,11 @@ export default function RegisterPage() {
         toast.success('Аккаунт создан! Войдите в систему.');
         router.push('/login');
       } else {
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         toast.error(data.error || 'Ошибка при регистрации');
       }
     } catch (error) {
-      // For demo - just redirect
-      toast.success('Аккаунт создан! Добро пожаловать.');
-      router.push('/');
+      toast.error('Ошибка сети. Попробуйте ещё раз.');
     } finally {
       setIsLoading(false);
     }
@@ -90,44 +87,28 @@ export default function RegisterPage() {
   return (
     <div className="min-h-screen flex">
       {/* Left side - Info */}
-      <div className="hidden lg:flex flex-1 bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 items-center justify-center p-12">
-        <div className="max-w-md text-white">
-          <h2 className="text-3xl font-bold mb-4">
+      <div className="hidden lg:flex flex-1 bg-primary items-center justify-center p-12">
+        <div className="max-w-md text-primary-foreground">
+          <h2 className="text-3xl font-semibold mb-3 tracking-tight">
             Начните бесплатно
           </h2>
-          <p className="text-white/80 text-lg mb-8">
+          <p className="text-primary-foreground/70 mb-8">
             Создайте аккаунт и начните управлять проектами уже сегодня
           </p>
 
-          <div className="space-y-4">
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-400" />
-              <span>Неограниченные проекты</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-400" />
-              <span>До 15 участников в команде</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-400" />
-              <span>AI-ассистент для планирования</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-400" />
-              <span>7+ готовых шаблонов</span>
-            </div>
-            <div className="flex items-center gap-3">
-              <CheckCircle2 className="h-5 w-5 text-green-400" />
-              <span>Интерактивный таймлайн</span>
-            </div>
-          </div>
-
-          <div className="mt-8 p-4 bg-white/10 rounded-lg">
-            <p className="text-sm text-white/90">
-              "TaskFlow помог нашей команде увеличить продуктивность на 40%. 
-              Рекомендую всем, кто управляет несколькими проектами!"
-            </p>
-            <p className="text-sm text-white/60 mt-2">— Алексей, Product Manager</p>
+          <div className="space-y-3">
+            {[
+              'Неограниченные проекты',
+              'Совместная работа в команде',
+              'Канбан, таймлайн и календарь',
+              'Готовые шаблоны проектов',
+              'Подзадачи и зависимости',
+            ].map((feature) => (
+              <div key={feature} className="flex items-center gap-3">
+                <CheckCircle2 className="h-5 w-5 text-primary-foreground/80 flex-shrink-0" />
+                <span>{feature}</span>
+              </div>
+            ))}
           </div>
         </div>
       </div>
@@ -136,16 +117,16 @@ export default function RegisterPage() {
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md">
           {/* Logo */}
-          <div className="flex items-center justify-center gap-2 mb-8">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-              <Sparkles className="h-5 w-5 text-white" />
+          <div className="flex items-center justify-center gap-2.5 mb-8">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold">
+              T
             </div>
-            <span className="text-2xl font-bold bg-gradient-to-r from-violet-600 to-purple-600 bg-clip-text text-transparent">
+            <span className="text-xl font-semibold text-foreground">
               TaskFlow
             </span>
           </div>
 
-          <Card className="border-0 shadow-xl">
+          <Card className="border-border shadow-sm">
             <CardHeader className="text-center">
               <CardTitle className="text-xl">Создать аккаунт</CardTitle>
               <CardDescription>
@@ -260,13 +241,9 @@ export default function RegisterPage() {
                   />
                   <label htmlFor="terms" className="text-sm text-muted-foreground">
                     Я принимаю{' '}
-                    <Link href="/terms" className="text-primary hover:underline">
-                      условия использования
-                    </Link>
+                    <span className="text-primary">условия использования</span>
                     {' '}и{' '}
-                    <Link href="/privacy" className="text-primary hover:underline">
-                      политику конфиденциальности
-                    </Link>
+                    <span className="text-primary">политику конфиденциальности</span>
                   </label>
                 </div>
 

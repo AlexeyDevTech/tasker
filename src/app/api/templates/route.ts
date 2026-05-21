@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { defaultTemplates } from '@/lib/templates';
+import { getUserId, unauthorized, badRequest } from '@/lib/api-auth';
 
 // GET /api/templates - Get all templates
 export async function GET(request: NextRequest) {
@@ -60,8 +61,15 @@ export async function GET(request: NextRequest) {
 // POST /api/templates - Create custom template
 export async function POST(request: NextRequest) {
   try {
+    const userId = await getUserId();
+    if (!userId) return unauthorized();
+
     const body = await request.json();
     const { name, description, category, icon, color, structure, isPublic } = body;
+
+    if (!name || !category || !structure) {
+      return badRequest('name, category and structure are required');
+    }
 
     const template = await db.template.create({
       data: {
@@ -72,6 +80,7 @@ export async function POST(request: NextRequest) {
         color: color || '#6366f1',
         structure: JSON.stringify(structure),
         isPublic: isPublic || false,
+        createdBy: userId,
       },
     });
 

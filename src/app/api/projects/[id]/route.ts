@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+import {
+  getUserId,
+  unauthorized,
+  forbidden,
+  canAccessProject,
+  parseBody,
+} from '@/lib/api-auth';
+import { updateProjectSchema } from '@/lib/validations';
 
 // GET /api/projects/[id] - Get single project
 export async function GET(
@@ -7,7 +15,12 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getUserId();
+    if (!userId) return unauthorized();
+
     const { id } = await params;
+
+    if (!(await canAccessProject(id, userId))) return forbidden();
 
     const project = await db.project.findUnique({
       where: { id },
@@ -75,16 +88,19 @@ export async function PATCH(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getUserId();
+    if (!userId) return unauthorized();
+
     const { id } = await params;
-    const body = await request.json();
+
+    if (!(await canAccessProject(id, userId))) return forbidden();
+
+    const parsed = await parseBody(request, updateProjectSchema);
+    if (parsed.response) return parsed.response;
 
     const project = await db.project.update({
       where: { id },
-      data: {
-        ...body,
-        ...(body.startDate && { startDate: new Date(body.startDate) }),
-        ...(body.endDate && { endDate: new Date(body.endDate) }),
-      },
+      data: parsed.data,
       include: {
         owner: {
           select: { id: true, name: true, email: true, image: true },
@@ -108,7 +124,17 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const userId = await getUserId();
+    if (!userId) return unauthorized();
+
     const { id } = await params;
+
+    // Only the owner may delete a project.
+    const project = await db.project.findFirst({
+      where: { id, ownerId: userId },
+      select: { id: true },
+    });
+    if (!project) return forbidden();
 
     await db.project.delete({
       where: { id },

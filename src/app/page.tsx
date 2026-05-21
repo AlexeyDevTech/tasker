@@ -7,6 +7,8 @@ import { useQuery, useMutation, useQueryClient, QueryClient, QueryClientProvider
 import { Sidebar } from '@/components/layout/sidebar';
 import { Header } from '@/components/layout/header';
 import { CommandPalette } from '@/components/layout/command-palette';
+import { WelcomeDashboard } from '@/components/dashboard/welcome-dashboard';
+import { DashboardStats } from '@/components/dashboard/dashboard-stats';
 import { ProjectCard } from '@/components/projects/project-card';
 import { TemplateSelector } from '@/components/projects/template-selector';
 import { BulkImportForm } from '@/components/projects/bulk-import-form';
@@ -244,7 +246,7 @@ function DashboardContent() {
 
   // Task stats
   const todoTasks = allTasks.filter((t: any) => t.status === 'todo');
-  const inProgressTasks = allTasks.filter((t: any) => t.status === 'in_progress');
+  const inProgressTasks = allTasks.filter((t: any) => t.status === 'in-progress');
   const doneTasks = allTasks.filter((t: any) => t.status === 'done');
   const overdueTasks = allTasks.filter((t: any) => 
     t.dueDate && isPast(new Date(t.dueDate)) && t.status !== 'done'
@@ -330,107 +332,26 @@ function DashboardContent() {
       
       <div className={cn(
         'transition-all duration-300',
-        sidebarOpen ? 'ml-64' : 'ml-0'
+        sidebarOpen ? 'ml-60' : 'ml-0'
       )}>
         <Header user={user} />
         
         <main className="p-6 lg:p-8 space-y-8">
-          {/* Welcome Section */}
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl lg:text-3xl font-bold mb-1">
-                {getGreeting()}, {user.name?.split(' ')[0] || 'Пользователь'}! 👋
-              </h1>
-              <p className="text-muted-foreground">
-                У вас {todoTasks.length} задач на сегодня. {overdueTasks.length > 0 && (
-                  <span className="text-destructive font-medium">{overdueTasks.length} просрочено.</span>
-                )}
-              </p>
-            </div>
-            <div className="flex items-center gap-3">
-              <Button 
-                variant="outline" 
-                className="gap-2"
-                onClick={() => setCreateTaskModalOpen(true)}
-              >
-                <CheckSquare className="h-4 w-4" />
-                Новая задача
-              </Button>
-              <Button 
-                className="gap-2 shadow-lg shadow-primary/20"
-                onClick={() => setCreateProjectModalOpen(true)}
-              >
-                <Plus className="h-4 w-4" />
-                Новый проект
-              </Button>
-            </div>
-          </div>
+          <WelcomeDashboard
+            userName={user.name?.split(' ')[0] || 'Пользователь'}
+            todoTasksCount={todoTasks.length}
+            overdueTasksCount={overdueTasks.length}
+            onNewTaskClick={() => setCreateTaskModalOpen(true)}
+            onNewProjectClick={() => setCreateProjectModalOpen(true)}
+            getGreeting={getGreeting}
+          />
 
-          {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5 hover:border-primary/30 transition-all duration-300 hover:shadow-lg">
-              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <Briefcase className="h-5 w-5 text-primary" />
-                  </div>
-                  <TrendingUp className="h-4 w-4 text-emerald-500" />
-                </div>
-                <p className="text-3xl font-bold">{activeProjects.length}</p>
-                <p className="text-sm text-muted-foreground">Активных проектов</p>
-              </div>
-            </div>
-
-            <div className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5 hover:border-amber-500/30 transition-all duration-300 hover:shadow-lg">
-              <div className="absolute inset-0 bg-gradient-to-br from-amber-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="h-10 w-10 rounded-xl bg-amber-500/10 flex items-center justify-center">
-                    <Timer className="h-5 w-5 text-amber-500" />
-                  </div>
-                  {inProgressTasks.length > 0 && (
-                    <Badge variant="secondary" className="bg-amber-500/10 text-amber-600">
-                      В работе
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-3xl font-bold">{inProgressTasks.length}</p>
-                <p className="text-sm text-muted-foreground">В процессе</p>
-              </div>
-            </div>
-
-            <div className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5 hover:border-emerald-500/30 transition-all duration-300 hover:shadow-lg">
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="h-10 w-10 rounded-xl bg-emerald-500/10 flex items-center justify-center">
-                    <CheckCircle2 className="h-5 w-5 text-emerald-500" />
-                  </div>
-                  {doneTasks.length > 0 && (
-                    <Badge variant="secondary" className="bg-emerald-500/10 text-emerald-600">
-                      Готово
-                    </Badge>
-                  )}
-                </div>
-                <p className="text-3xl font-bold">{doneTasks.length}</p>
-                <p className="text-sm text-muted-foreground">Выполнено</p>
-              </div>
-            </div>
-
-            <div className="group relative overflow-hidden rounded-2xl border border-border/50 bg-card p-5 hover:border-rose-500/30 transition-all duration-300 hover:shadow-lg">
-              <div className="absolute inset-0 bg-gradient-to-br from-rose-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-              <div className="relative">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="h-10 w-10 rounded-xl bg-rose-500/10 flex items-center justify-center">
-                    <Clock className="h-5 w-5 text-rose-500" />
-                  </div>
-                </div>
-                <p className="text-3xl font-bold text-rose-500">{overdueTasks.length}</p>
-                <p className="text-sm text-muted-foreground">Просрочено</p>
-              </div>
-            </div>
-          </div>
+          <DashboardStats
+            activeProjectsCount={activeProjects.length}
+            inProgressTasksCount={inProgressTasks.length}
+            doneTasksCount={doneTasks.length}
+            overdueTasksCount={overdueTasks.length}
+          />
 
           {/* Main Content Grid */}
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

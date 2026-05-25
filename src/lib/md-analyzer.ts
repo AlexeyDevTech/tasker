@@ -12,6 +12,8 @@
 // Токены в строке задачи:
 //   [ ] [x] [~] [>] [-]  → статус todo / done / in-progress / review / cancelled
 //   !urgent !high !medium(!med) !low → приоритет
+//   #bug #feature #chore #refactor #docs #spike → тип задачи
+//   ^N                   → story points (Agile-оценка)
 //   @имя                 → исполнитель (резолвится на сервере)
 //   due:ГГГГ-ММ-ДД | due:today | due:tomorrow → срок
 //   ~Nh | ~Nd (ч/д)      → оценка в часах (д = ×8)
@@ -19,6 +21,7 @@
 
 export type ParsedPriority = 'urgent' | 'high' | 'medium' | 'low';
 export type ParsedStatus = 'todo' | 'in-progress' | 'review' | 'done' | 'cancelled';
+export type ParsedType = 'feature' | 'bug' | 'chore' | 'refactor' | 'docs' | 'spike';
 
 export interface ParsedTask {
   id: string;
@@ -26,6 +29,8 @@ export interface ParsedTask {
   description?: string;
   status?: ParsedStatus;
   priority?: ParsedPriority;
+  type?: ParsedType;
+  storyPoints?: number;
   dueDate?: string; // ISO yyyy-mm-dd
   estimatedHours?: number;
   assignee?: string; // сырой @-хэндл, резолвится на сервере
@@ -49,6 +54,8 @@ export interface ParseResult {
 
 const CHECKBOX_RE = /^\[([ xX~>\-])\]\s+/;
 const PRIORITY_RE = /(?:^|\s)!(urgent|high|medium|med|low)\b/i;
+const TYPE_RE = /(?:^|\s)#(feature|bug|chore|refactor|docs|spike)\b/i;
+const POINTS_RE = /(?:^|\s)\^(\d+)\b/;
 const DUE_RE = /(?:^|\s)due:(\d{4}-\d{2}-\d{2}|today|tomorrow)\b/i;
 const ESTIMATE_RE = /(?:^|\s)~(\d+(?:\.\d+)?)\s*(h|ч|d|д)\b/i;
 const ASSIGNEE_RE = /(?:^|\s)@([\p{L}\p{N}._-]+)/u;
@@ -82,6 +89,8 @@ interface ExtractedMeta {
   title: string;
   status?: ParsedStatus;
   priority?: ParsedPriority;
+  type?: ParsedType;
+  storyPoints?: number;
   dueDate?: string;
   estimatedHours?: number;
   assignee?: string;
@@ -105,6 +114,18 @@ function extractMeta(raw: string): ExtractedMeta {
     const p = pr[1].toLowerCase();
     meta.priority = (p === 'med' ? 'medium' : p) as ParsedPriority;
     text = text.replace(pr[0], ' ');
+  }
+
+  const ty = text.match(TYPE_RE);
+  if (ty) {
+    meta.type = ty[1].toLowerCase() as ParsedType;
+    text = text.replace(ty[0], ' ');
+  }
+
+  const pts = text.match(POINTS_RE);
+  if (pts) {
+    meta.storyPoints = parseInt(pts[1], 10);
+    text = text.replace(pts[0], ' ');
   }
 
   const due = text.match(DUE_RE);
@@ -184,6 +205,8 @@ export function analyzeMarkdown(input: string): ParseResult {
       description: undefined,
       status: meta.status,
       priority: meta.priority,
+      type: meta.type,
+      storyPoints: meta.storyPoints,
       dueDate: meta.dueDate,
       estimatedHours: meta.estimatedHours,
       assignee: meta.assignee,

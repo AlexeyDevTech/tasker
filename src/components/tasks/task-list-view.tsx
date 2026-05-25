@@ -53,9 +53,20 @@ import {
   Trash2,
   ChevronLeft,
   ChevronRight,
+  Sparkles,
+  Bug,
+  Wrench,
+  Recycle,
+  FileText,
+  FlaskConical,
+  type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { STATUS_META, PRIORITY_META, getStatusMeta, getPriorityMeta } from '@/lib/task-config';
+import { STATUS_META, PRIORITY_META, getStatusMeta, getPriorityMeta, getTypeMeta, formatTaskKey } from '@/lib/task-config';
+
+const TYPE_ICONS: Record<string, LucideIcon> = {
+  Sparkles, Bug, Wrench, Recycle, FileText, FlaskConical,
+};
 import { DENSITY_METRICS, DENSITY_ORDER, getDensityMetrics } from '@/lib/density';
 import { useUIStore } from '@/stores/ui-store';
 import { format, isPast, isToday } from 'date-fns';
@@ -142,6 +153,9 @@ export function TaskListView({ tasks, isLoading, onStatusChange, onEdit, onDelet
         const task = row.original;
         const completed = task.subtasks?.filter((s: any) => s.status === 'done').length || 0;
         const total = task.subtasks?.length || 0;
+        const typeMeta = getTypeMeta(task.type);
+        const TypeIcon = TYPE_ICONS[typeMeta.icon] ?? Sparkles;
+        const k = formatTaskKey(task.project?.key, task.number);
         return (
           <div className="flex items-center gap-3">
             <Checkbox
@@ -150,8 +164,10 @@ export function TaskListView({ tasks, isLoading, onStatusChange, onEdit, onDelet
               onClick={(e) => e.stopPropagation()}
               className="border-border/60"
             />
+            <TypeIcon className={cn('h-4 w-4 shrink-0', typeMeta.iconColor)} aria-label={typeMeta.label} />
             <div className="flex flex-col gap-0.5 min-w-0">
               <span className={cn('font-medium leading-tight truncate', task.status === 'done' && 'line-through text-muted-foreground')}>
+                {k ? <span className="font-mono text-muted-foreground mr-1.5">{k}</span> : null}
                 {task.title}
               </span>
               {total > 0 && (

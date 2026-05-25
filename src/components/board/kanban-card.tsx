@@ -7,7 +7,22 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Progress } from '@/components/ui/progress';
-import { MoreHorizontal, Calendar, CheckCircle2, MessageSquare, GripVertical, Clock } from 'lucide-react';
+import {
+  MoreHorizontal,
+  Calendar,
+  CheckCircle2,
+  MessageSquare,
+  GripVertical,
+  Clock,
+  Hash,
+  Sparkles,
+  Bug,
+  Wrench,
+  Recycle,
+  FileText,
+  FlaskConical,
+  type LucideIcon,
+} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +31,11 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { getPriorityMeta } from '@/lib/task-config';
+import { getPriorityMeta, getTypeMeta, formatTaskKey } from '@/lib/task-config';
+
+const TYPE_ICONS: Record<string, LucideIcon> = {
+  Sparkles, Bug, Wrench, Recycle, FileText, FlaskConical,
+};
 import { format, isPast, isToday } from 'date-fns';
 import { ru } from 'date-fns/locale';
 
@@ -27,6 +46,10 @@ interface KanbanCardProps {
     description?: string | null;
     status: string;
     priority: string;
+    type?: string | null;
+    storyPoints?: number | null;
+    number?: number | null;
+    project?: { key?: string | null } | null;
     startDate?: Date | null;
     dueDate?: Date | null;
     progress?: number;
@@ -66,6 +89,9 @@ export function KanbanCard({ task, isDragging, onView, onEdit, onDelete }: Kanba
   const totalSubtasks = task.subtasks?.length || 0;
   const subtaskProgress = totalSubtasks > 0 ? (completedSubtasks / totalSubtasks) * 100 : 0;
   const priority = getPriorityMeta(task.priority);
+  const taskType = getTypeMeta(task.type);
+  const TypeIcon = TYPE_ICONS[taskType.icon] ?? Sparkles;
+  const taskKey = formatTaskKey(task.project?.key, task.number);
 
   const dueDate = task.dueDate ? new Date(task.dueDate) : null;
   const isOverdue = dueDate && isPast(dueDate) && task.status !== 'done';
@@ -103,18 +129,26 @@ export function KanbanCard({ task, isDragging, onView, onEdit, onDelete }: Kanba
       <div className="p-3">
         {/* Header: Priority & Menu */}
         <div className="flex items-start justify-between gap-2 mb-3">
-          <Badge 
-            variant="secondary"
-            className={cn(
-              'font-medium text-[11px] px-2 py-0.5 rounded-full border-0',
-              priority.badgeBg,
-              priority.badgeText
+          <div className="flex items-center gap-2 min-w-0">
+            <TypeIcon className={cn('h-4 w-4 shrink-0', taskType.iconColor)} aria-label={taskType.label} />
+            <Badge
+              variant="secondary"
+              className={cn(
+                'font-medium text-[11px] px-2 py-0.5 rounded-full border-0',
+                priority.badgeBg,
+                priority.badgeText
+              )}
+            >
+              <span className={cn('w-1.5 h-1.5 rounded-full mr-1.5', priority.dot)} />
+              {priority.label}
+            </Badge>
+            {taskKey && (
+              <span className="font-mono text-[11px] text-muted-foreground truncate">
+                {taskKey}
+              </span>
             )}
-          >
-            <span className={cn('w-1.5 h-1.5 rounded-full mr-1.5', priority.dot)} />
-            {priority.label}
-          </Badge>
-          
+          </div>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button 
@@ -199,6 +233,14 @@ export function KanbanCard({ task, isDragging, onView, onEdit, onDelete }: Kanba
               <div className="flex items-center gap-1 text-xs text-muted-foreground">
                 <MessageSquare className="h-3.5 w-3.5" />
                 <span>{task._count?.comments}</span>
+              </div>
+            )}
+
+            {/* Story points */}
+            {task.storyPoints != null && (
+              <div className="flex items-center gap-0.5 text-xs font-medium text-muted-foreground" title="Story points">
+                <Hash className="h-3.5 w-3.5" />
+                <span>{task.storyPoints}</span>
               </div>
             )}
           </div>

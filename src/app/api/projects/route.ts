@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { getUserId, unauthorized, badRequest, parseBody } from '@/lib/api-auth';
 import { createProjectSchema } from '@/lib/validations';
+import { generateProjectKey } from '@/lib/project-key';
+import { nextTaskNumber } from '@/lib/task-number';
 
 // GET /api/projects - Get all projects for current user
 export async function GET(request: NextRequest) {
@@ -74,6 +76,9 @@ export async function POST(request: NextRequest) {
       if (!parent) return badRequest('Invalid parent project');
     }
 
+    // Generate a unique, human-readable task-key prefix (e.g. "PROJ").
+    const key = await generateProjectKey(db, userId, name);
+
     // Create project
     const project = await db.project.create({
       data: {
@@ -81,6 +86,7 @@ export async function POST(request: NextRequest) {
         description,
         color: color || '#6366f1',
         icon,
+        key,
         parentId: parentId || null,
         ownerId: userId,
         templateId: templateId || null,
@@ -123,6 +129,7 @@ export async function POST(request: NextRequest) {
               priority: taskData.priority || 'medium',
               estimatedHours: taskData.estimatedHours,
               projectId: project.id,
+              number: await nextTaskNumber(db, project.id),
               position: i,
               startDate: project.startDate,
               dueDate: project.endDate,
@@ -138,6 +145,7 @@ export async function POST(request: NextRequest) {
                   title: taskData.subtasks[j].title,
                   parentId: task.id,
                   projectId: project.id,
+                  number: await nextTaskNumber(db, project.id),
                   position: j,
                   estimatedHours: taskData.subtasks[j].estimatedHours,
                 },

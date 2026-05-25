@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
 import type { ParsedProject, ParsedTask } from '@/lib/md-analyzer';
 import type { Prisma, PrismaClient } from '@prisma/client';
+import { generateProjectKey } from '@/lib/project-key';
+import { nextTaskNumber } from '@/lib/task-number';
 
 type Tx = Prisma.TransactionClient;
 
@@ -68,8 +70,11 @@ async function createTasksRecursive(
         assigneeId,
         status: task.status ?? undefined,
         priority: task.priority ?? undefined,
+        type: task.type ?? undefined,
+        storyPoints: task.storyPoints ?? null,
         dueDate: task.dueDate ? new Date(task.dueDate) : null,
         estimatedHours: task.estimatedHours ?? null,
+        number: await nextTaskNumber(tx, projectId),
         position: position++,
       },
     });
@@ -115,12 +120,18 @@ export async function POST(req: Request) {
 
         if (existing) {
           updatedProjects++;
+          // Backfill a key for projects that predate task numbering.
+          if (!existing.key) {
+            const key = await generateProjectKey(tx, userId, existing.name);
+            existing = await tx.project.update({ where: { id: existing.id }, data: { key } });
+          }
         } else {
           createdProjects++;
           existing = await tx.project.create({
             data: {
               name: project.name,
               description: project.description || null,
+              key: await generateProjectKey(tx, userId, project.name),
               ownerId: userId,
             },
           });

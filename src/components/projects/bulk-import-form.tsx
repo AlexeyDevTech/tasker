@@ -45,16 +45,17 @@ interface BulkImportFormProps {
 const exampleText = `# Запуск лендинга
 > Маркетинговый сайт к Q3
 
-- [ ] Дизайн !high @anna due:2026-06-10 ~8h +design
+- [ ] Дизайн #feature !high @anna due:2026-06-10 ~8h ^5 +design
   - [x] Главный экран
   - [~] Блок цен
 - [ ] Разработка !medium
   Сверстать на Next.js
-  - [ ] Вёрстка ~16h
+  - [ ] Вёрстка ~16h ^8
   - [ ] Интеграция API @ivan
+- [ ] Поправить вёрстку футера #bug !urgent ^2
 
 # Мобильное приложение
-- [ ] Прототип !urgent due:tomorrow
+- [ ] Прототип #spike !urgent due:tomorrow
 - [ ] Дизайн UI +mobile`;
 
 export function BulkImportForm({ open, onOpenChange, onImport }: BulkImportFormProps) {
@@ -137,6 +138,8 @@ export function BulkImportForm({ open, onOpenChange, onImport }: BulkImportFormP
               <Badge variant="outline" className="text-xs font-normal border-border/50"><span className="text-primary mr-1">-</span> задача</Badge>
               <Badge variant="outline" className="text-xs font-normal border-border/50"><span className="text-primary mr-1">[ ] [x] [~]</span> статус</Badge>
               <Badge variant="outline" className="text-xs font-normal border-border/50"><span className="text-primary mr-1">!high</span> приоритет</Badge>
+              <Badge variant="outline" className="text-xs font-normal border-border/50"><span className="text-primary mr-1">#bug</span> тип</Badge>
+              <Badge variant="outline" className="text-xs font-normal border-border/50"><span className="text-primary mr-1">^5</span> story points</Badge>
               <Badge variant="outline" className="text-xs font-normal border-border/50"><span className="text-primary mr-1">@имя</span> исполнитель</Badge>
               <Badge variant="outline" className="text-xs font-normal border-border/50"><span className="text-primary mr-1">due:дата</span> срок</Badge>
               <Badge variant="outline" className="text-xs font-normal border-border/50"><span className="text-primary mr-1">~4h</span> оценка</Badge>

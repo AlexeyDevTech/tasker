@@ -9,6 +9,7 @@ import {
   parseBody,
 } from '@/lib/api-auth';
 import { createTaskSchema, updateTaskSchema } from '@/lib/validations';
+import { nextTaskNumber } from '@/lib/task-number';
 
 // GET /api/tasks - Get tasks the current user can access
 export async function GET(request: NextRequest) {
@@ -40,9 +41,13 @@ export async function GET(request: NextRequest) {
         ...(status ? { status } : {}),
         ...(priority ? { priority } : {}),
         ...(assigneeId ? { assigneeId } : {}),
+        ...(sprint === 'backlog' ? { sprintId: null } : sprintId ? { sprintId } : {}),
         parentId: null, // Only top-level tasks by default
       },
       include: {
+        project: {
+          select: { id: true, key: true },
+        },
         assignee: {
           select: { id: true, name: true, email: true, image: true },
         },
@@ -93,6 +98,9 @@ export async function POST(request: NextRequest) {
       assigneeId,
       status,
       priority,
+      type,
+      storyPoints,
+      severity,
       startDate,
       dueDate,
       estimatedHours,
@@ -100,31 +108,39 @@ export async function POST(request: NextRequest) {
 
     if (!(await canAccessProject(projectId, userId))) return forbidden();
 
-    // Get max position in project
-    const maxPosition = await db.task.aggregate({
-      where: { projectId, parentId: parentId || null },
-      _max: { position: true },
-    });
+    // Assign position and a project-scoped number in one transaction so the
+    // counter increment and the task insert commit together.
+    const task = await db.$transaction(async (tx) => {
+      const maxPosition = await tx.task.aggregate({
+        where: { projectId, parentId: parentId || null },
+        _max: { position: true },
+      });
+      const number = await nextTaskNumber(tx, projectId);
 
-    const task = await db.task.create({
-      data: {
-        title,
-        description,
-        projectId,
-        parentId: parentId || null,
-        assigneeId: assigneeId || null,
-        status: status || 'todo',
-        priority: priority || 'medium',
-        startDate,
-        dueDate,
-        estimatedHours,
-        position: (maxPosition._max.position || 0) + 1,
-      },
-      include: {
-        assignee: {
-          select: { id: true, name: true, email: true, image: true },
+      return tx.task.create({
+        data: {
+          title,
+          description,
+          projectId,
+          parentId: parentId || null,
+          assigneeId: assigneeId || null,
+          status: status || 'todo',
+          priority: priority || 'medium',
+          type: type || 'feature',
+          storyPoints: storyPoints ?? null,
+          severity: severity ?? null,
+          startDate,
+          dueDate,
+          estimatedHours,
+          number,
+          position: (maxPosition._max.position || 0) + 1,
         },
-      },
+        include: {
+          assignee: {
+            select: { id: true, name: true, email: true, image: true },
+          },
+        },
+      });
     });
 
     // Log activity

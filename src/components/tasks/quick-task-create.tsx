@@ -35,13 +35,27 @@ import {
   Clock,
   Target,
   Briefcase,
+  Tag,
+  Bug,
+  Wrench,
+  Recycle,
+  FileText,
+  FlaskConical,
+  type LucideIcon,
 } from 'lucide-react';
+import { TYPE_META } from '@/lib/task-config';
+import type { TaskType } from '@/types';
+
+const TYPE_ICONS: Record<string, LucideIcon> = {
+  Sparkles, Bug, Wrench, Recycle, FileText, FlaskConical,
+};
 
 interface QuickTaskCreateProps {
   onTaskCreate?: (task: {
     title: string;
     description?: string;
     priority: 'low' | 'medium' | 'high';
+    type: TaskType;
     dueDate?: Date;
   }) => void | Promise<void>;
   projects?: Array<{
@@ -74,6 +88,7 @@ export function QuickTaskCreate({
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [type, setType] = useState<TaskType>('feature');
   const [dueDate, setDueDate] = useState<Date | undefined>();
   const [projectId, setProjectId] = useState<string>(defaultProjectId || '');
   const [isLoading, setIsLoading] = useState(false);
@@ -95,13 +110,15 @@ export function QuickTaskCreate({
         title: title.trim(),
         description: description.trim() || undefined,
         priority,
+        type,
         dueDate,
       });
-      
+
       // Reset form
       setTitle('');
       setDescription('');
       setPriority('medium');
+      setType('feature');
       setDueDate(undefined);
       setCreateTaskModalOpen(false);
     } catch (error) {
@@ -186,6 +203,32 @@ export function QuickTaskCreate({
                 rows={2}
                 className="resize-none border-border/60 focus:border-primary/50"
               />
+            </div>
+
+            {/* Type selector */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-2">
+                <Tag className="h-4 w-4 text-muted-foreground" />
+                Тип задачи
+              </Label>
+              <Select value={type} onValueChange={(v: TaskType) => setType(v)}>
+                <SelectTrigger className="h-11 border-border/60">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(TYPE_META).map(([key, value]) => {
+                    const Icon = TYPE_ICONS[value.icon] ?? Sparkles;
+                    return (
+                      <SelectItem key={key} value={key}>
+                        <div className="flex items-center gap-2">
+                          <Icon className={cn('h-4 w-4', value.iconColor)} />
+                          {value.label}
+                        </div>
+                      </SelectItem>
+                    );
+                  })}
+                </SelectContent>
+              </Select>
             </div>
 
             {/* Project and Priority row */}

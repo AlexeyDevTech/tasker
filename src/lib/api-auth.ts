@@ -75,6 +75,26 @@ export async function canAccessProject(
   return project !== null;
 }
 
+/** True if the user can access the project the sprint belongs to. */
+export async function canAccessSprint(
+  sprintId: string,
+  userId: string
+): Promise<boolean> {
+  const sprint = await db.sprint.findUnique({
+    where: { id: sprintId },
+    select: {
+      project: {
+        select: {
+          ownerId: true,
+          members: { where: { userId }, select: { id: true } },
+        },
+      },
+    },
+  });
+  if (!sprint) return false;
+  return sprint.project.ownerId === userId || sprint.project.members.length > 0;
+}
+
 /** True if the user owns the project the task belongs to, or is a member. */
 export async function canAccessTask(
   taskId: string,

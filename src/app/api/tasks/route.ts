@@ -22,6 +22,9 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const priority = searchParams.get('priority');
     const assigneeId = searchParams.get('assigneeId');
+    const sprintId = searchParams.get('sprintId');
+    // sprint=backlog → задачи без спринта
+    const sprint = searchParams.get('sprint');
 
     // Scope tasks to projects the user owns or is a member of.
     if (projectId) {

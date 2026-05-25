@@ -28,6 +28,8 @@ import {
   Calendar,
   GanttChart,
   Rows3,
+  Layers,
+  BarChart3,
   LogOut,
   Settings,
   User,
@@ -52,11 +54,13 @@ interface HeaderProps {
 }
 
 const viewModes: { value: ViewMode; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
+  { value: 'backlog', label: 'Бэклог', icon: Layers },
   { value: 'board', label: 'Доска', icon: LayoutGrid },
   { value: 'list', label: 'Список', icon: List },
   { value: 'timeline', label: 'Таймлайн', icon: GanttChart },
   { value: 'stream', label: 'Лента', icon: Rows3 },
   { value: 'calendar', label: 'Календарь', icon: Calendar },
+  { value: 'metrics', label: 'Метрики', icon: BarChart3 },
 ];
 
 export function Header({ user, projectId }: HeaderProps) {

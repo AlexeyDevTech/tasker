@@ -13,6 +13,8 @@ import { TimelineView } from '@/components/timeline/timeline-view';
 import { TimelineStream } from '@/components/timeline/timeline-stream';
 import { TaskListView } from '@/components/tasks/task-list-view';
 import { CalendarView } from '@/components/calendar/calendar-view';
+import { BacklogView } from '@/components/backlog/backlog-view';
+import { MetricsView } from '@/components/metrics/metrics-view';
 import { QuickTaskCreate } from '@/components/tasks/quick-task-create';
 import { TaskDetails } from '@/components/tasks/task-details';
 import { useProjectStore } from '@/stores/project-store';
@@ -54,6 +56,13 @@ async function fetchProject(id: string) {
 // Fetch project tasks
 async function fetchTasks(projectId: string) {
   const res = await fetch(`/api/tasks?projectId=${projectId}`);
+  const data = await res.json();
+  return data.data || [];
+}
+
+// Fetch project sprints
+async function fetchSprints(projectId: string) {
+  const res = await fetch(`/api/sprints?projectId=${projectId}`);
   const data = await res.json();
   return data.data || [];
 }
@@ -106,6 +115,14 @@ export default function ProjectPage() {
     queryFn: () => fetchTasks(projectId),
   });
 
+  const { data: sprints = [], isLoading: sprintsLoading } = useQuery({
+    queryKey: ['sprints', projectId],
+    queryFn: () => fetchSprints(projectId),
+  });
+
+  // Спринт, на доску которого «провалились» из бэклога (null = все задачи).
+  const [boardSprintId, setBoardSprintId] = useState<string | null>(null);
+
   const { data: allProjects = [] } = useQuery({
     queryKey: ['projects'],
     queryFn: async () => {
@@ -118,6 +135,77 @@ export default function ProjectPage() {
   // Mutations
   const updateTaskMutation = useMutation({
     mutationFn: updateTask,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      // Перенос задачи в спринт/из спринта меняет счётчики спринтов.
+      queryClient.invalidateQueries({ queryKey: ['sprints', projectId] });
+    },
+  });
+
+  // Sprint mutations
+  const createSprintMutation = useMutation({
+    mutationFn: async (data: { name: string; goal?: string }) => {
+      const res = await fetch('/api/sprints', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...data, projectId }),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sprints', projectId] });
+      toast.success('Спринт создан');
+    },
+  });
+
+  const updateSprintMutation = useMutation({
+    mutationFn: async ({ id, ...data }: { id: string; [key: string]: any }) => {
+      const res = await fetch(`/api/sprints/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sprints', projectId] });
+    },
+  });
+
+  const deleteSprintMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/sprints/${id}`, { method: 'DELETE' });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['sprints', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+      toast.success('Спринт удалён');
+    },
+  });
+
+  // Git link mutations
+  const addLinkMutation = useMutation({
+    mutationFn: async ({ taskId, url }: { taskId: string; url: string }) => {
+      const res = await fetch('/api/task-links', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, url }),
+      });
+      if (!res.ok) throw new Error('Не удалось добавить ссылку');
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
+    },
+    onError: (e: any) => toast.error(e.message),
+  });
+
+  const removeLinkMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const res = await fetch(`/api/task-links?id=${id}`, { method: 'DELETE' });
+      return res.json();
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks', projectId] });
     },
@@ -175,6 +263,20 @@ export default function ProjectPage() {
       deleteTaskMutation.mutate(taskId);
     }
   };
+
+  // Sprint handlers
+  const handleMoveTask = (taskId: string, sprintId: string | null) => {
+    updateTaskMutation.mutate({ id: taskId, sprintId });
+  };
+
+  const handleOpenSprintBoard = (sprintId: string) => {
+    setBoardSprintId(sprintId);
+    setViewMode('board');
+  };
+
+  // Задачи для доски/списка: при выбранном спринте — только его задачи.
+  const boardSprint = boardSprintId ? sprints.find((s: any) => s.id === boardSprintId) : null;
+  const viewTasks = boardSprintId ? tasks.filter((t: any) => t.sprintId === boardSprintId) : tasks;
 
   // Calculate progress
   const completedTasks = tasks.filter((t: any) => t.status === 'done').length;
@@ -234,11 +336,36 @@ export default function ProjectPage() {
             membersCount={project?.members?.length || 1}
           />
 
+          {/* Баннер активного фильтра по спринту (для доски/списка) */}
+          {boardSprint && (viewSettings.viewMode === 'board' || viewSettings.viewMode === 'list') && (
+            <div className="mt-4 flex items-center justify-between gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-2">
+              <span className="text-sm">
+                Спринт: <span className="font-medium">{boardSprint.name}</span>
+              </span>
+              <Button variant="ghost" size="sm" className="h-7" onClick={() => setBoardSprintId(null)}>
+                Показать все
+              </Button>
+            </div>
+          )}
+
           {/* View Content */}
           <div className="mt-4">
+            {viewSettings.viewMode === 'backlog' && (
+              <BacklogView
+                tasks={tasks}
+                sprints={sprints}
+                isLoading={isLoading || sprintsLoading}
+                onCreateSprint={(data) => createSprintMutation.mutate(data)}
+                onUpdateSprint={(id, data) => updateSprintMutation.mutate({ id, ...data })}
+                onDeleteSprint={(id) => deleteSprintMutation.mutate(id)}
+                onMoveTask={handleMoveTask}
+                onSelectTask={setActiveTaskId}
+                onOpenSprintBoard={handleOpenSprintBoard}
+              />
+            )}
             {viewSettings.viewMode === 'board' && (
               <KanbanBoard
-                tasks={tasks}
+                tasks={viewTasks}
                 onStatusChange={handleTaskStatusChange}
                 onCreateTask={handleCreateTask}
                 onEditTask={handleEditTask}
@@ -255,7 +382,7 @@ export default function ProjectPage() {
             )}
             {viewSettings.viewMode === 'list' && (
               <TaskListView
-                tasks={tasks}
+                tasks={viewTasks}
                 isLoading={isLoading}
                 onStatusChange={handleTaskStatusChange}
                 onDelete={handleDeleteTask}
@@ -264,6 +391,9 @@ export default function ProjectPage() {
             )}
             {viewSettings.viewMode === 'calendar' && (
               <CalendarView tasks={tasks} />
+            )}
+            {viewSettings.viewMode === 'metrics' && (
+              <MetricsView tasks={tasks} sprints={sprints} isLoading={isLoading || sprintsLoading} />
             )}
           </div>
         </main>
@@ -285,6 +415,8 @@ export default function ProjectPage() {
         open={!!activeTask}
         onOpenChange={(open) => !open && setActiveTaskId(null)}
         onUpdate={handleUpdateTask}
+        onAddLink={(taskId, url) => addLinkMutation.mutate({ taskId, url })}
+        onRemoveLink={(id) => removeLinkMutation.mutate(id)}
         onDelete={activeTask ? () => {
           handleDeleteTask(activeTask.id);
           setActiveTaskId(null);

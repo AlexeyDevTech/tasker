@@ -66,6 +66,7 @@ export async function GET(request: NextRequest) {
             tag: true,
           },
         },
+        links: true,
         dependenciesFrom: true,
         dependenciesTo: true,
       },

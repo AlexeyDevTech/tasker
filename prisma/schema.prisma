@@ -94,6 +94,12 @@ model Project {
   description String?
   color       String   @default("#6366f1")
   icon        String?  // Emoji or icon name
+
+  // Human-readable task key prefix, e.g. "PROJ" → tasks shown as PROJ-123.
+  // Nullable for projects created before keys existed (see prisma backfill).
+  key         String?
+  // Monotonic per-project counter; the next task gets taskCounter+1 as its number.
+  taskCounter Int      @default(0)
   
   // Hierarchy
   parentId    String?
@@ -129,10 +135,37 @@ model Project {
   members         ProjectMember[]
   milestones      Milestone[]
   activities      Activity[]
-  
+  sprints         Sprint[]
+
+  @@unique([ownerId, key])
   @@index([ownerId])
   @@index([parentId])
   @@map("projects")
+}
+
+// ============================================
+// SPRINTS (Agile iterations)
+// ============================================
+
+model Sprint {
+  id          String   @id @default(cuid())
+  name        String
+  goal        String?
+
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  startDate   DateTime?
+  endDate     DateTime?
+  status      String   @default("planned") // planned, active, completed
+
+  tasks       Task[]
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([projectId])
+  @@map("sprints")
 }
 
 // ============================================
@@ -192,6 +225,10 @@ model Task {
   // Project
   projectId   String
   project     Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  // Sequential number within the project; rendered as "<project.key>-<number>".
+  // Nullable for tasks created before numbering existed (see prisma backfill).
+  number      Int?
   
   // Hierarchy (subtasks)
   parentId    String?
@@ -205,6 +242,11 @@ model Task {
   // Status & Priority
   status      String   @default("todo") // todo, in-progress, review, done, cancelled
   priority    String   @default("medium") // urgent, high, medium, low
+
+  // Developer classification
+  type        String   @default("feature") // feature, bug, chore, refactor, docs, spike
+  storyPoints Int?     // Agile estimate (used by sprint velocity/burndown later)
+  severity    String?  // bug severity: critical, major, minor, trivial
   
   // Dates
   startDate   DateTime?
@@ -218,6 +260,10 @@ model Task {
   
   // Progress (for tasks with subtasks)
   progress    Int      @default(0) // 0-100
+
+  // Sprint assignment (null = backlog)
+  sprintId    String?
+  sprint      Sprint?  @relation(fields: [sprintId], references: [id], onDelete: SetNull)
   
   // Timestamps
   createdAt   DateTime @default(now())
@@ -230,14 +276,40 @@ model Task {
   tags          TaskTag[]
   attachments   Attachment[]
   checklist     ChecklistItem[]
+  links         TaskLink[]
   milestone     Milestone?      @relation(fields: [milestoneId], references: [id])
   milestoneId   String?
   
+  @@unique([projectId, number])
   @@index([projectId])
   @@index([assigneeId])
   @@index([status])
   @@index([parentId])
+  @@index([sprintId])
   @@map("tasks")
+}
+
+// ============================================
+// GIT / VCS LINKS
+// ============================================
+
+model TaskLink {
+  id         String   @id @default(cuid())
+
+  taskId     String
+  task       Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  provider   String   @default("github") // github, gitlab, other
+  kind       String   @default("pr")     // pr, commit, issue, branch
+  url        String
+  externalId String?  // PR/issue number or commit sha
+  title      String?
+  state      String?  // open, merged, closed (заполняется вручную/синком в Фазе 5)
+
+  createdAt  DateTime @default(now())
+
+  @@index([taskId])
+  @@map("task_links")
 }
 
 // ============================================

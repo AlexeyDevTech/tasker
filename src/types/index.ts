@@ -6,10 +6,16 @@
 
 export type TaskStatus = 'todo' | 'in-progress' | 'review' | 'done' | 'cancelled';
 export type TaskPriority = 'urgent' | 'high' | 'medium' | 'low';
+export type TaskType = 'feature' | 'bug' | 'chore' | 'refactor' | 'docs' | 'spike';
+export type TaskSeverity = 'critical' | 'major' | 'minor' | 'trivial';
 export type ProjectStatus = 'active' | 'completed' | 'archived' | 'on-hold';
 export type MemberRole = 'owner' | 'editor' | 'commenter' | 'viewer';
 export type DependencyType = 'finish-to-start' | 'start-to-start' | 'finish-to-finish' | 'start-to-finish';
 export type WorkTime = 'morning' | 'afternoon' | 'evening';
+export type SprintStatus = 'planned' | 'active' | 'completed';
+export type LinkProvider = 'github' | 'gitlab' | 'other';
+export type LinkKind = 'pr' | 'commit' | 'issue' | 'branch';
+export type LinkState = 'open' | 'merged' | 'closed';
 export type NotificationType = 'task-assigned' | 'comment' | 'mention' | 'deadline' | 'project-invite';
 
 // ============================================
@@ -38,6 +44,8 @@ export interface Project {
   description: string | null;
   color: string;
   icon: string | null;
+  key: string | null;
+  taskCounter: number;
   parentId: string | null;
   parent: Project | null;
   children: Project[];
@@ -75,6 +83,7 @@ export interface Task {
   id: string;
   title: string;
   description: string | null;
+  number: number | null;
   projectId: string;
   project: Project;
   parentId: string | null;
@@ -84,6 +93,9 @@ export interface Task {
   assignee: User | null;
   status: TaskStatus;
   priority: TaskPriority;
+  type: TaskType;
+  storyPoints: number | null;
+  severity: TaskSeverity | null;
   startDate: Date | null;
   dueDate: Date | null;
   completedAt: Date | null;
@@ -91,6 +103,7 @@ export interface Task {
   actualHours: number | null;
   position: number;
   progress: number;
+  sprintId: string | null;
   createdAt: Date;
   updatedAt: Date;
   dependenciesFrom: Dependency[];
@@ -99,8 +112,21 @@ export interface Task {
   tags: TaskTag[];
   attachments: Attachment[];
   checklist: ChecklistItem[];
+  links: TaskLink[];
   milestone: Milestone | null;
   milestoneId: string | null;
+}
+
+export interface TaskLink {
+  id: string;
+  taskId: string;
+  provider: LinkProvider;
+  kind: LinkKind;
+  url: string;
+  externalId: string | null;
+  title: string | null;
+  state: LinkState | null;
+  createdAt: Date;
 }
 
 // ============================================
@@ -133,6 +159,23 @@ export interface Milestone {
   createdAt: Date;
   updatedAt: Date;
   tasks: Task[];
+}
+
+// ============================================
+// Sprint
+// ============================================
+
+export interface Sprint {
+  id: string;
+  name: string;
+  goal: string | null;
+  projectId: string;
+  startDate: Date | null;
+  endDate: Date | null;
+  status: SprintStatus;
+  createdAt: Date;
+  updatedAt: Date;
+  tasks?: Task[];
 }
 
 // ============================================
@@ -329,7 +372,7 @@ export interface PaginatedResponse<T> {
 // UI State Types
 // ============================================
 
-export type ViewMode = 'timeline' | 'stream' | 'board' | 'list' | 'calendar';
+export type ViewMode = 'timeline' | 'stream' | 'board' | 'list' | 'calendar' | 'backlog' | 'metrics';
 
 export interface ProjectViewSettings {
   viewMode: ViewMode;

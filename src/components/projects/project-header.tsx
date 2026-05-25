@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Settings } from 'lucide-react';
+import { GithubImportDialog } from '@/components/integrations/github-import-dialog';
 
 interface ProjectHeaderProps {
   project: any; // TODO: Define a proper type for project
@@ -43,6 +44,7 @@ export function ProjectHeader({ project }: ProjectHeaderProps) {
       </div>
 
       <div className="flex items-center gap-2">
+        {project?.id && <GithubImportDialog projectId={project.id} />}
         <Button variant="outline" size="icon" className="h-8 w-8">
           <Settings className="h-4 w-4" />
         </Button>

@@ -178,6 +178,17 @@ export async function PATCH(request: NextRequest) {
 
     if (!(await canAccessTask(id, userId))) return forbidden();
 
+    // Авто-управление completedAt при смене статуса (если клиент не задал явно).
+    // Это даёт точку завершения для burndown и lead time (Фаза 3).
+    if (data.status !== undefined && data.completedAt === undefined) {
+      if (data.status === 'done') {
+        const current = await db.task.findUnique({ where: { id }, select: { completedAt: true } });
+        data.completedAt = current?.completedAt ?? new Date();
+      } else {
+        data.completedAt = null;
+      }
+    }
+
     const task = await db.task.update({
       where: { id },
       data,

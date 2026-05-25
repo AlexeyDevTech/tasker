@@ -28,9 +28,10 @@ import {
   MoreHorizontal,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { getPriorityMeta } from '@/lib/task-config';
 import { format, isToday, isTomorrow, isPast, addDays } from 'date-fns';
 import { ru } from 'date-fns/locale';
-import type { TaskPriority, TaskStatus } from '@/types';
+import type { TaskStatus } from '@/types';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -55,20 +56,6 @@ async function fetchProjects() {
   const data = await res.json();
   return data.data || [];
 }
-
-const priorityColors: Record<TaskPriority, string> = {
-  urgent: 'bg-red-500/10 text-red-600 border-red-500/20',
-  high: 'bg-orange-500/10 text-orange-600 border-orange-500/20',
-  medium: 'bg-yellow-500/10 text-yellow-600 border-yellow-500/20',
-  low: 'bg-green-500/10 text-green-600 border-green-500/20',
-};
-
-const priorityLabels: Record<TaskPriority, string> = {
-  urgent: 'Срочно',
-  high: 'Высокий',
-  medium: 'Средний',
-  low: 'Низкий',
-};
 
 const statusIcons: Record<TaskStatus, React.ReactNode> = {
   'todo': <Clock className="h-4 w-4 text-slate-500" />,
@@ -238,11 +225,10 @@ function InboxContent() {
                                 <div className="flex-1 min-w-0">
                                   <div className="flex items-center gap-2">
                                     <span className="font-medium truncate">{task.title}</span>
-                                    <Badge 
-                                      variant="outline" 
-                                      className={cn('text-xs', priorityColors[task.priority as TaskPriority])}
+                                    <Badge
+                                      className={cn('text-xs border-0', getPriorityMeta(task.priority).badgeBg, getPriorityMeta(task.priority).badgeText)}
                                     >
-                                      {priorityLabels[task.priority as TaskPriority]}
+                                      {getPriorityMeta(task.priority).label}
                                     </Badge>
                                   </div>
                                   {project && (

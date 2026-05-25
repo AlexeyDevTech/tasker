@@ -21,13 +21,13 @@ interface StatTileProps {
 function StatTile({ icon: Icon, iconClass, value, label, valueClass }: StatTileProps) {
   return (
     <div className="rounded-lg border border-border bg-card p-4 transition-colors hover:border-foreground/15">
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2 mb-2">
         <div className={cn('flex h-7 w-7 items-center justify-center rounded-md', iconClass)}>
           <Icon className="h-4 w-4" />
         </div>
-        <p className="text-sm text-muted-foreground">{label}</p>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
       </div>
-      <p className={cn('text-2xl font-semibold tracking-tight', valueClass)}>{value}</p>
+      <p className={cn('text-4xl font-bold tracking-tight tabular-nums', valueClass)}>{value}</p>
     </div>
   );
 }

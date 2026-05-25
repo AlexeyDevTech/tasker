@@ -39,6 +39,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { Plus, Sparkles } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PRIORITY_META, PRIORITY_ORDER } from '@/lib/task-config';
 import type { TaskStatus, TaskPriority } from '@/types';
 
 interface KanbanBoardProps {
@@ -47,6 +48,8 @@ interface KanbanBoardProps {
   onCreateTask: (data: any) => void;
   onEditTask: (taskId: string) => void;
   onDeleteTask: (taskId: string) => void;
+  /** Открыть задачу в общей правой шторке. Если задан — внутренняя шторка не рендерится. */
+  onViewTask?: (taskId: string) => void;
   isLoading?: boolean;
 }
 
@@ -57,7 +60,7 @@ const columns: { id: TaskStatus; title: string; color: string }[] = [
   { id: 'done', title: 'Готово', color: '#22c55e' },
 ];
 
-export function KanbanBoard({ tasks, onStatusChange, onCreateTask, onEditTask, onDeleteTask, isLoading }: KanbanBoardProps) {
+export function KanbanBoard({ tasks, onStatusChange, onCreateTask, onEditTask, onDeleteTask, onViewTask, isLoading }: KanbanBoardProps) {
   const [activeTask, setActiveTask] = useState<any | null>(null);
   const [viewingTask, setViewingTask] = useState<any | null>(null);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -136,6 +139,10 @@ export function KanbanBoard({ tasks, onStatusChange, onCreateTask, onEditTask, o
   };
 
   const handleViewTask = (taskId: string) => {
+    if (onViewTask) {
+      onViewTask(taskId);
+      return;
+    }
     const task = tasks.find((t) => t.id === taskId);
     setViewingTask(task);
   }
@@ -240,30 +247,17 @@ export function KanbanBoard({ tasks, onStatusChange, onCreateTask, onEditTask, o
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="urgent" className="gap-2">
-                      <span className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-rose-500" />
-                        Срочно
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="high">
-                      <span className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-amber-500" />
-                        Высокий
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="medium">
-                      <span className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-blue-500" />
-                        Средний
-                      </span>
-                    </SelectItem>
-                    <SelectItem value="low">
-                      <span className="flex items-center gap-2">
-                        <span className="h-2 w-2 rounded-full bg-slate-400" />
-                        Низкий
-                      </span>
-                    </SelectItem>
+                    {PRIORITY_ORDER.map((key) => {
+                      const meta = PRIORITY_META[key];
+                      return (
+                        <SelectItem key={key} value={key} className="gap-2">
+                          <span className="flex items-center gap-2">
+                            <span className={cn('h-2 w-2 rounded-full', meta.dot)} />
+                            {meta.label}
+                          </span>
+                        </SelectItem>
+                      );
+                    })}
                   </SelectContent>
                 </Select>
               </div>
@@ -301,7 +295,9 @@ export function KanbanBoard({ tasks, onStatusChange, onCreateTask, onEditTask, o
         </DialogContent>
       </Dialog>
       
-      <TaskDetails task={viewingTask} open={!!viewingTask} onOpenChange={() => setViewingTask(null)} />
+      {!onViewTask && (
+        <TaskDetails task={viewingTask} open={!!viewingTask} onOpenChange={() => setViewingTask(null)} />
+      )}
     </>
   );
 }

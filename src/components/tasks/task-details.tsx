@@ -1,12 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -39,22 +39,9 @@ import {
   Send,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { STATUS_META, PRIORITY_META, STATUS_ORDER, getStatusMeta, getPriorityMeta } from '@/lib/task-config';
 import { format, isPast, isToday } from 'date-fns';
 import { ru } from 'date-fns/locale';
-
-const statusConfig: Record<string, { label: string; bg: string; text: string }> = {
-  'todo': { label: 'К выполнению', bg: 'bg-slate-100 dark:bg-slate-800/50', text: 'text-slate-700 dark:text-slate-300' },
-  'in-progress': { label: 'В работе', bg: 'bg-blue-100 dark:bg-blue-900/30', text: 'text-blue-700 dark:text-blue-300' },
-  'review': { label: 'На проверке', bg: 'bg-amber-100 dark:bg-amber-900/30', text: 'text-amber-700 dark:text-amber-300' },
-  'done': { label: 'Готово', bg: 'bg-emerald-100 dark:bg-emerald-900/30', text: 'text-emerald-700 dark:text-emerald-300' },
-};
-
-const priorityConfig: Record<string, { label: string; dot: string }> = {
-  'low': { label: 'Низкий', dot: 'bg-slate-400' },
-  'medium': { label: 'Средний', dot: 'bg-blue-500' },
-  'high': { label: 'Высокий', dot: 'bg-amber-500' },
-  'urgent': { label: 'Срочно', dot: 'bg-rose-500' },
-};
 
 interface TaskDetailsProps {
   task: any;
@@ -71,10 +58,35 @@ export function TaskDetails({ task, open, onOpenChange, onUpdate, onDelete }: Ta
   const [newComment, setNewComment] = useState('');
   const [activeTab, setActiveTab] = useState('details');
 
+  // Контекстные горячие клавиши, пока шторка открыта:
+  //   E    — режим редактирования
+  //   1–5  — статус по порядку (К выполнению … Отменено)
+  useEffect(() => {
+    if (!open || !task) return;
+    const onKeyDown = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return;
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+
+      if (e.key.toLowerCase() === 'e') {
+        e.preventDefault();
+        setIsEditing((v) => !v);
+        return;
+      }
+      const idx = parseInt(e.key, 10);
+      if (!Number.isNaN(idx) && idx >= 1 && idx <= STATUS_ORDER.length) {
+        e.preventDefault();
+        onUpdate?.({ id: task.id, status: STATUS_ORDER[idx - 1] });
+      }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => document.removeEventListener('keydown', onKeyDown);
+  }, [open, task, onUpdate]);
+
   if (!task) return null;
 
-  const status = statusConfig[task.status] || statusConfig['todo'];
-  const priority = priorityConfig[task.priority] || priorityConfig['medium'];
+  const status = getStatusMeta(task.status);
+  const priority = getPriorityMeta(task.priority);
   
   const dueDate = task.dueDate ? new Date(task.dueDate) : null;
   const isOverdue = dueDate && isPast(dueDate) && task.status !== 'done';
@@ -108,11 +120,14 @@ export function TaskDetails({ task, open, onOpenChange, onUpdate, onDelete }: Ta
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] p-0 gap-0 bg-card/95 backdrop-blur-xl border-border/50">
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent
+        side="right"
+        className="w-full gap-0 p-0 sm:max-w-xl bg-card border-border/50"
+      >
         {/* Header */}
-        <div className="p-6 pb-0">
-          <DialogHeader>
+        <div className="p-6 pb-0 pr-12">
+          <SheetHeader className="p-0">
             <div className="flex items-start justify-between gap-4">
               {isEditing ? (
                 <Input
@@ -121,7 +136,7 @@ export function TaskDetails({ task, open, onOpenChange, onUpdate, onDelete }: Ta
                   className="text-xl font-semibold border-0 p-0 h-auto focus-visible:ring-0"
                 />
               ) : (
-                <DialogTitle className="text-xl leading-tight">{task.title}</DialogTitle>
+                <SheetTitle className="text-xl leading-tight">{task.title}</SheetTitle>
               )}
               <div className="flex items-center gap-2">
                 <Button
@@ -144,19 +159,19 @@ export function TaskDetails({ task, open, onOpenChange, onUpdate, onDelete }: Ta
                 )}
               </div>
             </div>
-          </DialogHeader>
+          </SheetHeader>
 
           {/* Quick actions */}
           <div className="flex flex-wrap items-center gap-2 mt-4">
             <Select value={task.status} onValueChange={handleStatusChange}>
               <SelectTrigger className="h-8 w-auto">
-                <Badge className={cn('font-medium', status.bg, status.text, 'border-0')}>
+                <Badge className={cn('font-medium', status.badgeBg, status.badgeText, 'border-0')}>
                   <CheckCircle2 className="h-3 w-3 mr-1" />
                   {status.label}
                 </Badge>
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(statusConfig).map(([key, value]) => (
+                {Object.entries(STATUS_META).map(([key, value]) => (
                   <SelectItem key={key} value={key}>{value.label}</SelectItem>
                 ))}
               </SelectContent>
@@ -170,7 +185,7 @@ export function TaskDetails({ task, open, onOpenChange, onUpdate, onDelete }: Ta
                 </Badge>
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(priorityConfig).map(([key, value]) => (
+                {Object.entries(PRIORITY_META).map(([key, value]) => (
                   <SelectItem key={key} value={key}>
                     <span className="flex items-center gap-2">
                       <span className={cn('w-2 h-2 rounded-full', value.dot)} />
@@ -206,7 +221,7 @@ export function TaskDetails({ task, open, onOpenChange, onUpdate, onDelete }: Ta
         </div>
 
         {/* Content */}
-        <ScrollArea className="flex-1 px-6 py-4 max-h-[400px]">
+        <ScrollArea className="flex-1 px-6 py-4">
           <Tabs value={activeTab} className="w-full">
             <TabsContent value="details" className="mt-0 space-y-5">
               {/* Description */}
@@ -347,7 +362,7 @@ export function TaskDetails({ task, open, onOpenChange, onUpdate, onDelete }: Ta
             <Button onClick={handleSave}>Сохранить</Button>
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+      </SheetContent>
+    </Sheet>
   );
 }

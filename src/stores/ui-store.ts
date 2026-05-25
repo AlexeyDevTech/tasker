@@ -1,11 +1,17 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 
+export type Density = 'comfortable' | 'compact' | 'super-compact';
+
 interface UIState {
   // Theme
   theme: 'light' | 'dark' | 'system';
   setTheme: (theme: 'light' | 'dark' | 'system') => void;
-  
+
+  // Density (плотность списков/таблиц)
+  density: Density;
+  setDensity: (density: Density) => void;
+
   // Command palette
   commandPaletteOpen: boolean;
   setCommandPaletteOpen: (open: boolean) => void;
@@ -24,7 +30,11 @@ interface UIState {
   
   createTaskModalOpen: boolean;
   setCreateTaskModalOpen: (open: boolean) => void;
-  
+
+  // Активная задача в правой контекстной шторке (null = закрыта)
+  activeTaskId: string | null;
+  setActiveTaskId: (id: string | null) => void;
+
   // Toast queue
   toasts: Toast[];
   addToast: (toast: Omit<Toast, 'id'>) => void;
@@ -52,7 +62,11 @@ export const useUIStore = create<UIState>()(
       // Theme
       theme: 'system',
       setTheme: (theme) => set({ theme }),
-      
+
+      // Density
+      density: 'comfortable',
+      setDensity: (density) => set({ density }),
+
       // Command palette
       commandPaletteOpen: false,
       setCommandPaletteOpen: (open) => set({ commandPaletteOpen: open }),
@@ -71,7 +85,11 @@ export const useUIStore = create<UIState>()(
       
       createTaskModalOpen: false,
       setCreateTaskModalOpen: (open) => set({ createTaskModalOpen: open }),
-      
+
+      // Active task drawer
+      activeTaskId: null,
+      setActiveTaskId: (id) => set({ activeTaskId: id }),
+
       // Toast queue
       toasts: [],
       addToast: (toast) => set((state) => ({
@@ -93,6 +111,7 @@ export const useUIStore = create<UIState>()(
       name: 'taskflow-ui-store',
       partialize: (state) => ({
         theme: state.theme,
+        density: state.density,
         timelineZoom: state.timelineZoom,
       }),
     }

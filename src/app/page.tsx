@@ -9,6 +9,7 @@ import { Header } from '@/components/layout/header';
 import { CommandPalette } from '@/components/layout/command-palette';
 import { WelcomeDashboard } from '@/components/dashboard/welcome-dashboard';
 import { DashboardStats } from '@/components/dashboard/dashboard-stats';
+import { FocusToday } from '@/components/dashboard/focus-today';
 import { ProjectCard } from '@/components/projects/project-card';
 import { TemplateSelector } from '@/components/projects/template-selector';
 import { BulkImportForm } from '@/components/projects/bulk-import-form';
@@ -46,13 +47,11 @@ import {
   Target,
   Zap,
   Briefcase,
-  ChevronRight,
   Star,
   Play,
   Pause,
   CheckSquare,
   Timer,
-  Activity,
   FileText,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -259,11 +258,6 @@ function DashboardContent() {
     (new Date(t.dueDate) > new Date() && new Date(t.dueDate) <= addDays(new Date(), 7)))
   );
 
-  // Recent projects (last 5)
-  const recentProjects = [...activeProjects]
-    .sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-    .slice(0, 5);
-
   // Filter projects
   const filteredProjects = projects.filter((p: any) => 
     p.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -357,6 +351,9 @@ function DashboardContent() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Projects List */}
             <div className="lg:col-span-2 space-y-6">
+              {/* В фокусе — что требует внимания сегодня (по всем проектам) */}
+              <FocusToday tasks={allTasks} projects={projects} />
+
               {/* Quick Actions */}
               <div className="flex flex-wrap gap-3">
                 <button
@@ -617,50 +614,6 @@ function DashboardContent() {
                     </div>
                   )}
                 </ScrollArea>
-              </div>
-
-              {/* Recent Projects */}
-              <div className="rounded-2xl border border-border/50 bg-card overflow-hidden">
-                <div className="p-4 border-b border-border/50 bg-muted/30">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-semibold flex items-center gap-2">
-                      <Activity className="h-4 w-4 text-primary" />
-                      Недавние проекты
-                    </h3>
-                  </div>
-                </div>
-                <div className="p-2">
-                  {recentProjects.length === 0 ? (
-                    <div className="p-4 text-center text-sm text-muted-foreground">
-                      <FolderOpen className="h-8 w-8 mx-auto mb-2" />
-                      <p>Нет недавних проектов</p>
-                    </div>
-                  ) : (
-                    recentProjects.map((project: any) => (
-                      <Link
-                        key={project.id}
-                        href={`/projects/${project.id}`}
-                        className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted/50 transition-colors group"
-                      >
-                        <div 
-                          className="h-8 w-8 rounded-lg flex items-center justify-center text-sm"
-                          style={{ backgroundColor: `${project.color || '#6366f1'}20` }}
-                        >
-                          {project.icon || '📁'}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate group-hover:text-primary transition-colors">
-                            {project.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {project._count?.tasks || 0} задач
-                          </p>
-                        </div>
-                        <ChevronRight className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </Link>
-                    ))
-                  )}
-                </div>
               </div>
 
               {/* Quick Stats */}

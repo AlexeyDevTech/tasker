@@ -16,35 +16,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { getPriorityMeta } from '@/lib/task-config';
 import { format, isPast, isToday } from 'date-fns';
 import { ru } from 'date-fns/locale';
-
-const priorityConfig: Record<string, { bg: string; text: string; dot: string; label: string }> = {
-  low: { 
-    bg: 'bg-slate-100 dark:bg-slate-800/50', 
-    text: 'text-slate-600 dark:text-slate-400',
-    dot: 'bg-slate-400',
-    label: 'Низкий'
-  },
-  medium: { 
-    bg: 'bg-blue-100 dark:bg-blue-900/30', 
-    text: 'text-blue-700 dark:text-blue-400',
-    dot: 'bg-blue-500',
-    label: 'Средний'
-  },
-  high: { 
-    bg: 'bg-amber-100 dark:bg-amber-900/30', 
-    text: 'text-amber-700 dark:text-amber-400',
-    dot: 'bg-amber-500',
-    label: 'Высокий'
-  },
-  urgent: { 
-    bg: 'bg-rose-100 dark:bg-rose-900/30', 
-    text: 'text-rose-700 dark:text-rose-400',
-    dot: 'bg-rose-500',
-    label: 'Срочно'
-  },
-};
 
 interface KanbanCardProps {
   task: {
@@ -91,7 +65,7 @@ export function KanbanCard({ task, isDragging, onView, onEdit, onDelete }: Kanba
   const completedSubtasks = task.subtasks?.filter((s) => s.status === 'done').length || 0;
   const totalSubtasks = task.subtasks?.length || 0;
   const subtaskProgress = totalSubtasks > 0 ? (completedSubtasks / totalSubtasks) * 100 : 0;
-  const priority = priorityConfig[task.priority] || priorityConfig.medium;
+  const priority = getPriorityMeta(task.priority);
 
   const dueDate = task.dueDate ? new Date(task.dueDate) : null;
   const isOverdue = dueDate && isPast(dueDate) && task.status !== 'done';
@@ -133,8 +107,8 @@ export function KanbanCard({ task, isDragging, onView, onEdit, onDelete }: Kanba
             variant="secondary"
             className={cn(
               'font-medium text-[11px] px-2 py-0.5 rounded-full border-0',
-              priority.bg,
-              priority.text
+              priority.badgeBg,
+              priority.badgeText
             )}
           >
             <span className={cn('w-1.5 h-1.5 rounded-full mr-1.5', priority.dot)} />

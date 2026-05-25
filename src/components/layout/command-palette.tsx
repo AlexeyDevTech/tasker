@@ -36,6 +36,7 @@ import {
 import { useState, useEffect } from 'react';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
+import { useGlobalHotkeys } from '@/hooks/use-global-hotkeys';
 
 interface CommandPaletteProps {
   projects?: Array<{
@@ -51,6 +52,9 @@ export function CommandPalette({ projects = [] }: CommandPaletteProps) {
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [search, setSearch] = useState('');
+
+  // Глобальные горячие клавиши приложения (C, ⌘N, G→H)
+  useGlobalHotkeys();
 
   // Handle keyboard shortcut
   useEffect(() => {
@@ -215,7 +219,7 @@ export function CommandPalette({ projects = [] }: CommandPaletteProps) {
               >
                 <LayoutDashboard className="h-4 w-4 text-muted-foreground" />
                 <span className="flex-1">Дашборд</span>
-                <CommandShortcut className="bg-muted/50 px-1.5 py-0.5 rounded text-[10px]">⌘D</CommandShortcut>
+                <CommandShortcut className="bg-muted/50 px-1.5 py-0.5 rounded text-[10px]">G H</CommandShortcut>
               </CommandItem>
               
               <CommandItem 

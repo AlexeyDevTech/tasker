@@ -13,6 +13,7 @@ import { TimelineView } from '@/components/timeline/timeline-view';
 import { TaskListView } from '@/components/tasks/task-list-view';
 import { CalendarView } from '@/components/calendar/calendar-view';
 import { QuickTaskCreate } from '@/components/tasks/quick-task-create';
+import { TaskDetails } from '@/components/tasks/task-details';
 import { useProjectStore } from '@/stores/project-store';
 import { useUIStore } from '@/stores/ui-store';
 import { Button } from '@/components/ui/button';
@@ -91,7 +92,7 @@ export default function ProjectPage() {
   const projectId = params.projectId as string;
   
   const { sidebarOpen, viewSettings, setViewMode } = useProjectStore();
-  const { commandPaletteOpen, setCommandPaletteOpen, createTaskModalOpen, setCreateTaskModalOpen } = useUIStore();
+  const { commandPaletteOpen, setCommandPaletteOpen, createTaskModalOpen, setCreateTaskModalOpen, activeTaskId, setActiveTaskId } = useUIStore();
 
   // Queries
   const { data: project, isLoading: projectLoading } = useQuery({
@@ -144,6 +145,14 @@ export default function ProjectPage() {
   const handleTaskStatusChange = (taskId: string, newStatus: string) => {
     updateTaskMutation.mutate({ id: taskId, status: newStatus });
   };
+
+  // Handle task update from the detail drawer (title/description/status/priority)
+  const handleUpdateTask = (data: { id: string; [key: string]: any }) => {
+    updateTaskMutation.mutate(data);
+  };
+
+  // Task currently shown in the right contextual drawer
+  const activeTask = activeTaskId ? tasks.find((t: any) => t.id === activeTaskId) ?? null : null;
 
   // Handle create task
   const handleCreateTask = (taskData: any) => {
@@ -227,12 +236,13 @@ export default function ProjectPage() {
           {/* View Content */}
           <div className="mt-4">
             {viewSettings.viewMode === 'board' && (
-              <KanbanBoard 
-                tasks={tasks} 
+              <KanbanBoard
+                tasks={tasks}
                 onStatusChange={handleTaskStatusChange}
                 onCreateTask={handleCreateTask}
                 onEditTask={handleEditTask}
                 onDeleteTask={handleDeleteTask}
+                onViewTask={setActiveTaskId}
                 isLoading={isLoading}
               />
             )}
@@ -240,7 +250,13 @@ export default function ProjectPage() {
               <TimelineView tasks={tasks} project={project} />
             )}
             {viewSettings.viewMode === 'list' && (
-              <TaskListView tasks={tasks} isLoading={isLoading} />
+              <TaskListView
+                tasks={tasks}
+                isLoading={isLoading}
+                onStatusChange={handleTaskStatusChange}
+                onDelete={handleDeleteTask}
+                onSelectTask={setActiveTaskId}
+              />
             )}
             {viewSettings.viewMode === 'calendar' && (
               <CalendarView tasks={tasks} />
@@ -253,10 +269,22 @@ export default function ProjectPage() {
       <CommandPalette projects={allProjects} />
       
       {/* Quick Task Create */}
-      <QuickTaskCreate 
+      <QuickTaskCreate
         onTaskCreate={handleCreateTask}
         projects={allProjects}
         defaultProjectId={projectId}
+      />
+
+      {/* Right contextual task drawer — shared across all views */}
+      <TaskDetails
+        task={activeTask}
+        open={!!activeTask}
+        onOpenChange={(open) => !open && setActiveTaskId(null)}
+        onUpdate={handleUpdateTask}
+        onDelete={activeTask ? () => {
+          handleDeleteTask(activeTask.id);
+          setActiveTaskId(null);
+        } : undefined}
       />
     </div>
   );

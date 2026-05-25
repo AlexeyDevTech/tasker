@@ -31,6 +31,10 @@ interface UIState {
   createTaskModalOpen: boolean;
   setCreateTaskModalOpen: (open: boolean) => void;
 
+  // Массовый импорт проектов из текста
+  bulkImportOpen: boolean;
+  setBulkImportOpen: (open: boolean) => void;
+
   // Активная задача в правой контекстной шторке (null = закрыта)
   activeTaskId: string | null;
   setActiveTaskId: (id: string | null) => void;
@@ -85,6 +89,10 @@ export const useUIStore = create<UIState>()(
       
       createTaskModalOpen: false,
       setCreateTaskModalOpen: (open) => set({ createTaskModalOpen: open }),
+
+      // Bulk import
+      bulkImportOpen: false,
+      setBulkImportOpen: (open) => set({ bulkImportOpen: open }),
 
       // Active task drawer
       activeTaskId: null,

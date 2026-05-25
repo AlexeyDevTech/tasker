@@ -27,6 +27,7 @@ import {
   List,
   Calendar,
   GanttChart,
+  Rows3,
   LogOut,
   Settings,
   User,
@@ -54,6 +55,7 @@ const viewModes: { value: ViewMode; label: string; icon: React.ComponentType<{ c
   { value: 'board', label: 'Доска', icon: LayoutGrid },
   { value: 'list', label: 'Список', icon: List },
   { value: 'timeline', label: 'Таймлайн', icon: GanttChart },
+  { value: 'stream', label: 'Лента', icon: Rows3 },
   { value: 'calendar', label: 'Календарь', icon: Calendar },
 ];
 

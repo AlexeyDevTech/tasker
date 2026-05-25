@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,18 +13,26 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
-import { parseBulkText, ParsedProject } from '@/lib/bulk-parser';
-import { 
-  Loader2, 
-  Upload, 
-  FileText, 
-  CheckCircle2, 
-  AlertCircle,
-  Sparkles,
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  analyzeMarkdown,
+  countTasks,
+  type ParsedProject,
+  type ParsedTask,
+} from '@/lib/md-analyzer';
+import { getStatusMeta, getPriorityMeta } from '@/lib/task-config';
+import {
+  Loader2,
+  Upload,
+  FileText,
+  AlertTriangle,
   Copy,
   Trash2,
   Info,
+  Calendar,
+  Clock,
+  User,
+  Tag as TagIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -34,113 +42,80 @@ interface BulkImportFormProps {
   onImport: (data: ParsedProject[]) => void;
 }
 
-const exampleText = `# Веб-сайт компании
-- Дизайн макета
-  - Главная страница
-  - Страница контактов
-- Разработка
-  - Верстка
-  - Интеграция с API
-- Тестирование
+const exampleText = `# Запуск лендинга
+> Маркетинговый сайт к Q3
+
+- [ ] Дизайн !high @anna due:2026-06-10 ~8h +design
+  - [x] Главный экран
+  - [~] Блок цен
+- [ ] Разработка !medium
+  Сверстать на Next.js
+  - [ ] Вёрстка ~16h
+  - [ ] Интеграция API @ivan
 
 # Мобильное приложение
-- Прототип
-- Дизайн UI
-- Разработка`;
+- [ ] Прототип !urgent due:tomorrow
+- [ ] Дизайн UI +mobile`;
 
 export function BulkImportForm({ open, onOpenChange, onImport }: BulkImportFormProps) {
   const [inputText, setInputText] = useState('');
-  const [isParsing, setIsParsing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [preview, setPreview] = useState<ParsedProject[] | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
 
-  const handleParsePreview = () => {
-    if (!inputText.trim()) {
-      setPreview(null);
-      return;
-    }
-    
-    try {
-      const parsed = parseBulkText(inputText);
-      setPreview(parsed);
-      setError(null);
-    } catch (e: any) {
-      setError(e.message);
-      setPreview(null);
-    }
-  };
-  
+  const result = useMemo(() => (inputText.trim() ? analyzeMarkdown(inputText) : null), [inputText]);
+  const projects = result?.projects ?? [];
+  const warnings = result?.warnings ?? [];
+  const projectCount = projects.length;
+  const taskCount = projects.reduce((acc, p) => acc + countTasks(p.tasks), 0);
+  const canImport = projectCount > 0;
+
   const handleImportClick = () => {
-    setIsParsing(true);
-    setError(null);
+    if (!canImport) return;
+    setIsImporting(true);
     try {
-      const parsedData = parseBulkText(inputText);
-      onImport(parsedData);
+      onImport(projects);
       handleClose();
-    } catch (e: any) {
-      setError(e.message);
     } finally {
-      setIsParsing(false);
+      setIsImporting(false);
     }
   };
 
-  const handleInsertExample = () => {
-    setInputText(exampleText);
-    setTimeout(handleParsePreview, 100);
-  };
-
-  const handleClear = () => {
-    setInputText('');
-    setPreview(null);
-    setError(null);
-  };
-  
   const handleClose = () => {
     onOpenChange(false);
   };
 
-  // Count stats
-  const projectCount = preview?.length || 0;
-  const taskCount = preview?.reduce((acc, p) => acc + p.tasks.length, 0) || 0;
-
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] p-0 gap-0 bg-card/95 backdrop-blur-xl border-border/50">
+      <DialogContent className="max-w-4xl max-h-[90vh] p-0 gap-0 bg-card border-border/50">
         {/* Header */}
         <DialogHeader className="p-6 pb-0">
           <div className="flex items-center gap-4">
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-500 to-blue-600 text-white shadow-lg shadow-sky-500/30">
-              <Upload className="h-5 w-5" />
+              <FileText className="h-5 w-5" />
             </div>
             <div>
-              <DialogTitle className="text-xl">Массовое создание из текста</DialogTitle>
+              <DialogTitle className="text-xl">MD-анализатор</DialogTitle>
               <DialogDescription className="mt-1">
-                Вставьте структуру проекта в текстовом формате для быстрого импорта
+                Опишите проекты в Markdown — задачи, подзадачи и метаданные создадутся автоматически
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
         <div className="p-6 grid grid-cols-2 gap-6">
-          {/* Left side - Input */}
+          {/* Левая часть — ввод */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
-              <Label className="text-sm font-medium">Структура проекта</Label>
+              <Label className="text-sm font-medium">Markdown</Label>
               <div className="flex items-center gap-2">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="h-7 text-xs gap-1.5"
-                  onClick={handleInsertExample}
-                >
+                <Button variant="ghost" size="sm" className="h-7 text-xs gap-1.5" onClick={() => setInputText(exampleText)}>
                   <Copy className="h-3 w-3" />
                   Пример
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Button
+                  variant="ghost"
+                  size="sm"
                   className="h-7 text-xs gap-1.5 text-destructive hover:text-destructive"
-                  onClick={handleClear}
+                  onClick={() => setInputText('')}
                   disabled={!inputText}
                 >
                   <Trash2 className="h-3 w-3" />
@@ -148,101 +123,79 @@ export function BulkImportForm({ open, onOpenChange, onImport }: BulkImportFormP
                 </Button>
               </div>
             </div>
-            
+
             <Textarea
-              placeholder={`# Название проекта
-- Задача 1
-  - Подзадача
-- Задача 2`}
+              placeholder={`# Название проекта\n- [ ] Задача !high due:2026-06-01\n  - [ ] Подзадача`}
               value={inputText}
-              onChange={(e) => {
-                setInputText(e.target.value);
-                setError(null);
-              }}
-              onBlur={handleParsePreview}
+              onChange={(e) => setInputText(e.target.value)}
               className="h-80 font-mono text-sm resize-none border-border/60 focus:border-primary/50 bg-muted/30"
             />
 
-            {/* Format help */}
-            <div className="flex flex-wrap gap-2">
-              <Badge variant="outline" className="text-xs font-normal border-border/50">
-                <span className="text-primary mr-1">#</span> Проект
-              </Badge>
-              <Badge variant="outline" className="text-xs font-normal border-border/50">
-                <span className="text-primary mr-1">-</span> Задача
-              </Badge>
-              <Badge variant="outline" className="text-xs font-normal border-border/50">
-                <span className="text-muted-foreground mr-1">  </span> Отступ = вложенность
-              </Badge>
+            {/* Справка по синтаксису */}
+            <div className="flex flex-wrap gap-1.5">
+              <Badge variant="outline" className="text-xs font-normal border-border/50"><span className="text-primary mr-1">#</span> проект</Badge>
+              <Badge variant="outline" className="text-xs font-normal border-border/50"><span className="text-primary mr-1">-</span> задача</Badge>
+              <Badge variant="outline" className="text-xs font-normal border-border/50"><span className="text-primary mr-1">[ ] [x] [~]</span> статус</Badge>
+              <Badge variant="outline" className="text-xs font-normal border-border/50"><span className="text-primary mr-1">!high</span> приоритет</Badge>
+              <Badge variant="outline" className="text-xs font-normal border-border/50"><span className="text-primary mr-1">@имя</span> исполнитель</Badge>
+              <Badge variant="outline" className="text-xs font-normal border-border/50"><span className="text-primary mr-1">due:дата</span> срок</Badge>
+              <Badge variant="outline" className="text-xs font-normal border-border/50"><span className="text-primary mr-1">~4h</span> оценка</Badge>
+              <Badge variant="outline" className="text-xs font-normal border-border/50"><span className="text-primary mr-1">+тег</span> тег</Badge>
             </div>
 
-            {error && (
-              <div className="flex items-start gap-2 p-3 rounded-lg bg-destructive/10 text-destructive text-sm">
-                <AlertCircle className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                <span>{error}</span>
+            {warnings.length > 0 && (
+              <div className="space-y-1.5">
+                {warnings.map((w, i) => (
+                  <div key={i} className="flex items-start gap-2 p-2.5 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs">
+                    <AlertTriangle className="h-3.5 w-3.5 mt-0.5 flex-shrink-0" />
+                    <span>{w}</span>
+                  </div>
+                ))}
               </div>
             )}
           </div>
 
-          {/* Right side - Preview */}
+          {/* Правая часть — превью */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <Label className="text-sm font-medium">Предпросмотр</Label>
-              {preview && preview.length > 0 && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <Badge variant="secondary" className="font-medium">
-                    {projectCount} {projectCount === 1 ? 'проект' : projectCount < 5 ? 'проекта' : 'проектов'}
-                  </Badge>
-                  <Badge variant="secondary" className="font-medium">
-                    {taskCount} {taskCount === 1 ? 'задача' : taskCount < 5 ? 'задачи' : 'задач'}
-                  </Badge>
+              {projectCount > 0 && (
+                <div className="flex items-center gap-2">
+                  <Badge variant="secondary" className="font-medium text-xs">{projectCount} проект(ов)</Badge>
+                  <Badge variant="secondary" className="font-medium text-xs">{taskCount} задач(и)</Badge>
                 </div>
               )}
             </div>
 
             <div className="h-80 rounded-xl border border-border/50 bg-muted/20 overflow-hidden">
-              {preview && preview.length > 0 ? (
-                <div className="h-full overflow-y-auto p-4 space-y-4">
-                  {preview.map((project, index) => (
-                    <Card key={index} className="border-border/50 bg-card/50">
-                      <CardContent className="p-4">
-                        <div className="flex items-center gap-2 mb-3">
-                          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+              {projectCount > 0 ? (
+                <ScrollArea className="h-full">
+                  <div className="p-4 space-y-4">
+                    {projects.map((project) => (
+                      <div key={project.id} className="rounded-lg border border-border/50 bg-card/50 p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="h-7 w-7 rounded-lg bg-primary/10 flex items-center justify-center">
                             <FileText className="h-4 w-4 text-primary" />
                           </div>
-                          <span className="font-semibold">{project.name}</span>
-                          <Badge variant="outline" className="ml-auto text-xs">
-                            {project.tasks.length} задач
-                          </Badge>
+                          <span className="font-semibold text-sm">{project.name}</span>
+                          <Badge variant="outline" className="ml-auto text-xs">{countTasks(project.tasks)}</Badge>
                         </div>
-                        
-                        {project.tasks.length > 0 && (
-                          <div className="space-y-1 ml-4">
-                            {project.tasks.slice(0, 5).map((task, i) => (
-                              <div key={i} className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <div className="h-1.5 w-1.5 rounded-full bg-primary/50" />
-                                <span className={cn(task.level === 1 && "ml-3")}>
-                                  {task.title}
-                                </span>
-                              </div>
-                            ))}
-                            {project.tasks.length > 5 && (
-                              <span className="text-xs text-muted-foreground ml-3">
-                                + ещё {project.tasks.length - 5} задач
-                              </span>
-                            )}
-                          </div>
+                        {project.description && (
+                          <p className="text-xs text-muted-foreground mb-2 ml-1">{project.description}</p>
                         )}
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+                        <div className="space-y-0.5">
+                          {project.tasks.map((task) => (
+                            <TaskNode key={task.id} task={task} depth={0} />
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
               ) : (
                 <div className="h-full flex flex-col items-center justify-center text-muted-foreground p-4">
                   <Info className="h-10 w-10 mb-3 opacity-50" />
-                  <p className="text-sm text-center">
-                    Введите текст слева, чтобы увидеть предпросмотр
-                  </p>
+                  <p className="text-sm text-center">Введите Markdown слева — справа появится структура</p>
                 </div>
               )}
             </div>
@@ -251,12 +204,12 @@ export function BulkImportForm({ open, onOpenChange, onImport }: BulkImportFormP
 
         <DialogFooter className="p-6 pt-0 border-t border-border/50">
           <Button variant="outline" onClick={handleClose}>Отмена</Button>
-          <Button 
-            onClick={handleImportClick} 
-            disabled={isParsing || !inputText.trim() || !!error}
+          <Button
+            onClick={handleImportClick}
+            disabled={isImporting || !canImport}
             className="gap-2 bg-primary hover:bg-primary/90 shadow-lg shadow-primary/25"
           >
-            {isParsing ? (
+            {isImporting ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 Импорт...
@@ -264,12 +217,56 @@ export function BulkImportForm({ open, onOpenChange, onImport }: BulkImportFormP
             ) : (
               <>
                 <Upload className="h-4 w-4" />
-                Импортировать
+                Создать
               </>
             )}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// Рекурсивная строка задачи в превью с бейджами метаданных.
+function TaskNode({ task, depth }: { task: ParsedTask; depth: number }) {
+  const status = task.status ? getStatusMeta(task.status) : null;
+  const priority = task.priority ? getPriorityMeta(task.priority) : null;
+
+  return (
+    <div>
+      <div className="flex items-center gap-2 py-1 text-sm" style={{ paddingLeft: depth * 16 }}>
+        <span className={cn('h-1.5 w-1.5 rounded-full flex-shrink-0', priority ? priority.dot : 'bg-muted-foreground/40')} />
+        <span className={cn('truncate', task.status === 'done' && 'line-through text-muted-foreground')}>{task.title}</span>
+
+        <div className="flex items-center gap-1 flex-shrink-0">
+          {status && (
+            <Badge className={cn('h-4 px-1.5 text-[10px] border-0', status.badgeBg, status.badgeText)}>{status.label}</Badge>
+          )}
+          {task.dueDate && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
+              <Calendar className="h-3 w-3" />{task.dueDate.slice(5)}
+            </span>
+          )}
+          {task.estimatedHours != null && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
+              <Clock className="h-3 w-3" />{task.estimatedHours}ч
+            </span>
+          )}
+          {task.assignee && (
+            <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
+              <User className="h-3 w-3" />{task.assignee}
+            </span>
+          )}
+          {task.tags?.map((t) => (
+            <span key={t} className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
+              <TagIcon className="h-3 w-3" />{t}
+            </span>
+          ))}
+        </div>
+      </div>
+      {task.children.map((child) => (
+        <TaskNode key={child.id} task={child} depth={depth + 1} />
+      ))}
+    </div>
   );
 }

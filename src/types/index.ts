@@ -329,7 +329,7 @@ export interface PaginatedResponse<T> {
 // UI State Types
 // ============================================
 
-export type ViewMode = 'timeline' | 'board' | 'list' | 'calendar';
+export type ViewMode = 'timeline' | 'stream' | 'board' | 'list' | 'calendar';
 
 export interface ProjectViewSettings {
   viewMode: ViewMode;

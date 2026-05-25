@@ -11,10 +11,10 @@ import { WelcomeDashboard } from '@/components/dashboard/welcome-dashboard';
 import { DashboardStats } from '@/components/dashboard/dashboard-stats';
 import { FocusToday } from '@/components/dashboard/focus-today';
 import { ProjectCard } from '@/components/projects/project-card';
-import { TemplateSelector } from '@/components/projects/template-selector';
+import { CreateProjectDialog } from '@/components/projects/create-project-dialog';
 import { BulkImportForm } from '@/components/projects/bulk-import-form';
 import { QuickTaskCreate } from '@/components/tasks/quick-task-create';
-import { type ParsedProject } from '@/lib/bulk-parser';
+import { type ParsedProject } from '@/lib/md-analyzer';
 import { useProjectStore } from '@/stores/project-store';
 import { useUIStore } from '@/stores/ui-store';
 import { Button } from '@/components/ui/button';
@@ -38,7 +38,6 @@ import {
   FolderOpen,
   Sparkles,
   ArrowRight,
-  Upload,
   CheckCircle2,
   Clock,
   TrendingUp,
@@ -50,7 +49,6 @@ import {
   Star,
   Play,
   Pause,
-  CheckSquare,
   Timer,
   FileText,
 } from 'lucide-react';
@@ -82,14 +80,6 @@ async function fetchProjects() {
 async function fetchTasks() {
   const res = await fetch('/api/tasks');
   if (!res.ok) throw new Error('Failed to fetch tasks');
-  const data = await res.json();
-  return data.data || [];
-}
-
-// Fetch templates
-async function fetchTemplates() {
-  const res = await fetch('/api/templates');
-  if (!res.ok) throw new Error('Failed to fetch templates');
   const data = await res.json();
   return data.data || [];
 }
@@ -164,8 +154,7 @@ function DashboardContent() {
 
   const queryClient = useQueryClient();
   const { sidebarOpen } = useProjectStore();
-  const { createProjectModalOpen, setCreateProjectModalOpen, createTaskModalOpen, setCreateTaskModalOpen } = useUIStore();
-  const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
+  const { createProjectModalOpen, setCreateProjectModalOpen, createTaskModalOpen, setCreateTaskModalOpen, bulkImportOpen, setBulkImportOpen } = useUIStore();
   
   const [searchQuery, setSearchQuery] = useState('');
   const [viewType, setViewType] = useState<'grid' | 'list'>('grid');
@@ -180,12 +169,6 @@ function DashboardContent() {
   const { data: allTasks = [], isLoading: isLoadingTasks } = useQuery({
     queryKey: ['all-tasks'],
     queryFn: fetchTasks,
-    enabled: status === 'authenticated',
-  });
-
-  const { data: templates = [] } = useQuery({
-    queryKey: ['templates'],
-    queryFn: fetchTemplates,
     enabled: status === 'authenticated',
   });
 
@@ -220,7 +203,7 @@ function DashboardContent() {
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success(data.message);
-      setIsBulkImportOpen(false);
+      setBulkImportOpen(false);
     },
     onError: (error) => {
       toast.error(`Ошибка при импорте: ${error.message}`);
@@ -353,48 +336,6 @@ function DashboardContent() {
             <div className="lg:col-span-2 space-y-6">
               {/* В фокусе — что требует внимания сегодня (по всем проектам) */}
               <FocusToday tasks={allTasks} projects={projects} />
-
-              {/* Quick Actions */}
-              <div className="flex flex-wrap gap-3">
-                <button
-                  onClick={() => setCreateProjectModalOpen(true)}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/50 bg-card hover:bg-accent hover:border-primary/30 transition-all duration-200 group"
-                >
-                  <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Plus className="h-4 w-4 text-primary" />
-                  </div>
-                  <div className="text-left">
-                    <p className="font-medium text-sm">Новый проект</p>
-                    <p className="text-xs text-muted-foreground">С шаблоном или с нуля</p>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setIsBulkImportOpen(true)}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/50 bg-card hover:bg-accent hover:border-sky-500/30 transition-all duration-200 group"
-                >
-                  <div className="h-9 w-9 rounded-lg bg-sky-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <Upload className="h-4 w-4 text-sky-500" />
-                  </div>
-                  <div className="text-left">
-                    <p className="font-medium text-sm">Импорт</p>
-                    <p className="text-xs text-muted-foreground">Из текста</p>
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => setCreateTaskModalOpen(true)}
-                  className="flex items-center gap-3 px-4 py-3 rounded-xl border border-border/50 bg-card hover:bg-accent hover:border-emerald-500/30 transition-all duration-200 group"
-                >
-                  <div className="h-9 w-9 rounded-lg bg-emerald-500/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <CheckSquare className="h-4 w-4 text-emerald-500" />
-                  </div>
-                  <div className="text-left">
-                    <p className="font-medium text-sm">Быстрая задача</p>
-                    <p className="text-xs text-muted-foreground">Создать за секунду</p>
-                  </div>
-                </button>
-              </div>
 
               {/* Search and View Toggle */}
               <div className="flex flex-col sm:flex-row gap-3">
@@ -646,8 +587,8 @@ function DashboardContent() {
       </div>
 
       <CommandPalette projects={projects} />
-      <TemplateSelector open={createProjectModalOpen} onOpenChange={setCreateProjectModalOpen} templates={templates} onSelect={handleCreateProject} />
-      <BulkImportForm open={isBulkImportOpen} onOpenChange={setIsBulkImportOpen} onImport={handleBulkImport} />
+      <CreateProjectDialog open={createProjectModalOpen} onOpenChange={setCreateProjectModalOpen} onSelect={handleCreateProject} />
+      <BulkImportForm open={bulkImportOpen} onOpenChange={setBulkImportOpen} onImport={handleBulkImport} />
       <QuickTaskCreate 
         onTaskCreate={handleCreateTask}
         projects={projects}

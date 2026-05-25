@@ -2,88 +2,142 @@ import { NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { db } from '@/lib/db';
-import type { ParsedProject, ParsedTask } from '@/lib/bulk-parser';
-import type { PrismaClient } from '@prisma/client';
+import type { ParsedProject, ParsedTask } from '@/lib/md-analyzer';
+import type { Prisma, PrismaClient } from '@prisma/client';
+
+type Tx = Prisma.TransactionClient;
+
+interface UserLite {
+  id: string;
+  name: string | null;
+  email: string;
+}
+
+// Сопоставляет @-хэндл из markdown с пользователем (по имени/почте).
+function resolveAssignee(handle: string | undefined, users: UserLite[]): string | null {
+  if (!handle) return null;
+  const h = handle.toLowerCase();
+  const match = users.find((u) => {
+    const name = (u.name ?? '').toLowerCase();
+    const emailLocal = u.email.toLowerCase().split('@')[0];
+    return name === h || name.replace(/\s+/g, '') === h || emailLocal === h || name.startsWith(h);
+  });
+  return match?.id ?? null;
+}
+
+interface CreateStats {
+  tasks: number;
+  unresolvedAssignees: Set<string>;
+}
+
+// Кэш тегов на пользователя в рамках одного импорта (имя → id).
+async function ensureTag(tx: Tx, userId: string, name: string, cache: Map<string, string>): Promise<string> {
+  const key = name.toLowerCase();
+  const cached = cache.get(key);
+  if (cached) return cached;
+  const tag = await tx.tag.upsert({
+    where: { userId_name: { userId, name } },
+    create: { name, userId },
+    update: {},
+  });
+  cache.set(key, tag.id);
+  return tag.id;
+}
 
 async function createTasksRecursive(
-  prisma: PrismaClient,
+  tx: Tx,
   tasks: ParsedTask[],
   projectId: string,
   ownerId: string,
-  parentId?: string
-): Promise<number> {
-  let count = 0;
+  users: UserLite[],
+  tagCache: Map<string, string>,
+  stats: CreateStats,
+  parentId: string | undefined,
+): Promise<void> {
+  let position = 0;
   for (const task of tasks) {
-    count++;
-    const createdTask = await prisma.task.create({
+    const assigneeId = resolveAssignee(task.assignee, users);
+    if (task.assignee && !assigneeId) stats.unresolvedAssignees.add(task.assignee);
+
+    const created = await tx.task.create({
       data: {
         title: task.title,
-        projectId: projectId,
-        assigneeId: ownerId, // Assign to project owner by default
-        parentId: parentId,
+        description: task.description || null,
+        projectId,
+        parentId: parentId ?? null,
+        assigneeId,
+        status: task.status ?? undefined,
+        priority: task.priority ?? undefined,
+        dueDate: task.dueDate ? new Date(task.dueDate) : null,
+        estimatedHours: task.estimatedHours ?? null,
+        position: position++,
       },
     });
+    stats.tasks++;
+
+    // Теги задачи (создаём недостающие, привязываем).
+    if (task.tags && task.tags.length > 0) {
+      for (const tagName of task.tags) {
+        const tagId = await ensureTag(tx, ownerId, tagName, tagCache);
+        await tx.taskTag.create({ data: { taskId: created.id, tagId } });
+      }
+    }
 
     if (task.children && task.children.length > 0) {
-      const childrenCount = await createTasksRecursive(prisma, task.children, projectId, ownerId, createdTask.id);
-      count += childrenCount;
+      await createTasksRecursive(tx, task.children, projectId, ownerId, users, tagCache, stats, created.id);
     }
   }
-  return count;
-};
+}
 
 export async function POST(req: Request) {
   try {
     const session = await getServerSession(authOptions);
     const userId = session?.user?.id;
-
-    if (!userId) {
-      return new NextResponse('Unauthorized', { status: 401 });
-    }
+    if (!userId) return new NextResponse('Unauthorized', { status: 401 });
 
     const projectsToCreate: ParsedProject[] = await req.json();
-
     if (!Array.isArray(projectsToCreate) || projectsToCreate.length === 0) {
       return new NextResponse('Invalid input: Expected an array of projects.', { status: 400 });
     }
 
-    let createdProjectsCount = 0;
-    let createdTasksCount = 0;
+    // Кандидаты для резолвинга исполнителей (SQLite не поддерживает insensitive-фильтр,
+    // поэтому сопоставляем в JS).
+    const users: UserLite[] = await db.user.findMany({ select: { id: true, name: true, email: true } });
 
-    let updatedProjectsCount = 0;
+    let createdProjects = 0;
+    let updatedProjects = 0;
+    const stats: CreateStats = { tasks: 0, unresolvedAssignees: new Set() };
+    const tagCache = new Map<string, string>();
 
-    await db.$transaction(async (prisma) => {
+    await db.$transaction(async (tx) => {
       for (const project of projectsToCreate) {
-        // Find existing project or create a new one
-        let existingProject = await prisma.project.findFirst({
-          where: {
-            name: project.name,
-            ownerId: userId,
-          },
-        });
+        let existing = await tx.project.findFirst({ where: { name: project.name, ownerId: userId } });
 
-        if (existingProject) {
-          updatedProjectsCount++;
+        if (existing) {
+          updatedProjects++;
         } else {
-          createdProjectsCount++;
-          existingProject = await prisma.project.create({
+          createdProjects++;
+          existing = await tx.project.create({
             data: {
               name: project.name,
+              description: project.description || null,
               ownerId: userId,
             },
           });
         }
 
-        if (project.tasks && project.tasks.length > 0) {
-          createdTasksCount += await createTasksRecursive(prisma as unknown as PrismaClient, project.tasks, existingProject.id, userId);
+        if (project.tasks?.length) {
+          await createTasksRecursive(tx, project.tasks, existing.id, userId, users, tagCache, stats, undefined);
         }
       }
     });
 
-    return NextResponse.json({
-      message: `Successfully created ${createdProjectsCount} and updated ${updatedProjectsCount} projects, adding ${createdTasksCount} tasks.`,
-    });
+    let message = `Создано проектов: ${createdProjects}, дополнено: ${updatedProjects}, задач: ${stats.tasks}.`;
+    if (stats.unresolvedAssignees.size > 0) {
+      message += ` Не найдены исполнители: ${Array.from(stats.unresolvedAssignees).map((a) => `@${a}`).join(', ')}.`;
+    }
 
+    return NextResponse.json({ message });
   } catch (error) {
     console.error('[BULK_IMPORT_ERROR]', error);
     return new NextResponse('Internal Server Error', { status: 500 });

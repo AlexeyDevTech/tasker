@@ -26,6 +26,7 @@ import {
   LayoutDashboard,
   Sparkles,
   Plus,
+  Upload,
   Moon,
   Sun,
   LogOut,
@@ -48,7 +49,7 @@ interface CommandPaletteProps {
 }
 
 export function CommandPalette({ projects = [] }: CommandPaletteProps) {
-  const { commandPaletteOpen, setCommandPaletteOpen, setCreateProjectModalOpen } = useUIStore();
+  const { commandPaletteOpen, setCommandPaletteOpen, setCreateProjectModalOpen, setBulkImportOpen } = useUIStore();
   const router = useRouter();
   const { theme, setTheme } = useTheme();
   const [search, setSearch] = useState('');
@@ -78,6 +79,13 @@ export function CommandPalette({ projects = [] }: CommandPaletteProps) {
   const handleCreateProject = () => {
     setCommandPaletteOpen(false);
     setCreateProjectModalOpen(true);
+  };
+
+  // Импорт живёт на дашборде — переходим туда и открываем форму.
+  const handleBulkImport = () => {
+    setCommandPaletteOpen(false);
+    router.push('/');
+    setBulkImportOpen(true);
   };
 
   return (
@@ -112,8 +120,21 @@ export function CommandPalette({ projects = [] }: CommandPaletteProps) {
                 </div>
                 <CommandShortcut className="bg-muted/50 px-1.5 py-0.5 rounded text-[10px]">⌘N</CommandShortcut>
               </CommandItem>
-              
-              <CommandItem 
+
+              <CommandItem
+                onSelect={() => handleSelect(handleBulkImport)}
+                className="gap-3 cursor-pointer rounded-lg hover:bg-muted/50"
+              >
+                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-sky-500/10">
+                  <Upload className="h-4 w-4 text-sky-500" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-medium">MD-анализатор</p>
+                  <p className="text-xs text-muted-foreground">Создать проекты и задачи из Markdown</p>
+                </div>
+              </CommandItem>
+
+              <CommandItem
                 onSelect={() => handleSelect(() => router.push('/inbox'))}
                 className="gap-3 cursor-pointer rounded-lg hover:bg-muted/50"
               >

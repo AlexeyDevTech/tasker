@@ -10,6 +10,7 @@ import { ProjectHeader } from '@/components/projects/project-header';
 import { ProjectStats } from '@/components/projects/project-stats';
 import { KanbanBoard } from '@/components/board/kanban-board';
 import { TimelineView } from '@/components/timeline/timeline-view';
+import { TimelineStream } from '@/components/timeline/timeline-stream';
 import { TaskListView } from '@/components/tasks/task-list-view';
 import { CalendarView } from '@/components/calendar/calendar-view';
 import { QuickTaskCreate } from '@/components/tasks/quick-task-create';
@@ -248,6 +249,9 @@ export default function ProjectPage() {
             )}
             {viewSettings.viewMode === 'timeline' && (
               <TimelineView tasks={tasks} project={project} />
+            )}
+            {viewSettings.viewMode === 'stream' && (
+              <TimelineStream tasks={tasks} onSelectTask={setActiveTaskId} />
             )}
             {viewSettings.viewMode === 'list' && (
               <TaskListView
